@@ -125,15 +125,19 @@ public class NextHop {
 			@Override
 			public int compare(NextHop o1, NextHop o2) {
 				// TODO Auto-generated method stub
+				int ret = 0; //equal!
 				if (o2.type > o1.type) { // higher type number get lower
-											// priority
-					return 1;
-				} else if (o2.metric > o1.metric) { // larger metric get
+					ret = -1;  // priority
+				} else if( o2.type < o1.type ){
+					ret = 1;
+				}else if (o2.metric > o1.metric) { // larger metric get
 													// lower priority!
-					return 1;
-				}
+					ret = -1;
+				} else if( o2.metric < o1.metric ){
+					ret = 1;
+				} 
 
-				return 0;
+				return ret;
 			}
 		};
 	}
