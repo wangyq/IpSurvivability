@@ -42,14 +42,18 @@ public class LFA {
 		graph.calcShortestPath();
 		graph.printMatrix();
 		graph.printShortestPath();
+		
+		Vector<FibTable> tbls = FibTable.makeAllFibTable(graph);
+		
+		FibTable.printTables(graph,tbls);
 	}
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
-		testShortestPath();
-		//testDirectGraph();
+		//testShortestPath();
+		testDirectGraph();
 	}
 
 }
