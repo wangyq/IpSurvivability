@@ -32,7 +32,9 @@ public class MyFileReader {
 		MyFileReader  ff = null;
 		ArrayList<String> lines =  new ArrayList<String>();
 		try {
-			String strCurDir = System.getProperty("user.dir");  // current directory!
+			//String strCurDir = System.getProperty("user.dir");  // current directory!
+			String strCurDir = MyFileReader.class.getResource("/").getFile();
+
 			String strFile = strCurDir + File.separator + strFilename;
 
 			BufferedReader bufferedReader = new BufferedReader(new FileReader(strFile));
