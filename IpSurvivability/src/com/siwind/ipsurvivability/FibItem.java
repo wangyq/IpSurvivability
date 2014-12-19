@@ -80,7 +80,8 @@ public class FibItem {
 				pp = new NextHop();
 				pp.setHop(node);
 				pp.setType(NextHop.Type.DIRECT);
-				pp.setMetric(graph.getShortestPathMetric(src,dst));     //here is the real metric from src to dst.
+				pp.setMetric(0);
+				//pp.setMetric(graph.getMetric(src,dst));     //here is the real metric from src to dst.
 			} else {
 
 				Vector<Integer> path_adj = graph.getShortestPathByIndex(node, dst); // path!!

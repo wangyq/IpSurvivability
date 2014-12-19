@@ -24,7 +24,7 @@ public class NextHop {
 		private String mark;
 
 		/**
-		 *
+		 * 构造函数必须为私有
 		 */
 		private Type(){
 			mark = this.name().substring(0,1);

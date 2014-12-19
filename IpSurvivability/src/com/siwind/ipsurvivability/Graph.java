@@ -85,6 +85,12 @@ public class Graph {
 		return sp;
 	}
 
+	/**
+	 *
+	 * @param i
+	 * @param j
+	 * @return
+	 */
 	public String getShortestPathLabel(int i, int j) {
 		Vector<Integer> sp = (Vector<Integer>) shortestPath[getPathIndex(i, j)];
 		StringBuilder sb = new StringBuilder("");
@@ -117,7 +123,17 @@ public class Graph {
 	public int getShortestPathMetric(int src, int dst) {
 		return shortestNum[getPathIndex(src, dst)];
 	}
-	
+
+	/**
+	 * return the metric that src direct link to dst
+	 * @param src
+	 * @param dst
+	 * @return
+	 */
+	public int getMetric(int src, int dst){
+
+		return matrix[src][dst];
+	}
 	/**
 	 * 最短路径的数目 n*n
 	 * 
