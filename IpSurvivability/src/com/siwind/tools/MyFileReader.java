@@ -1,6 +1,7 @@
 package com.siwind.tools;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -31,7 +32,10 @@ public class MyFileReader {
 		MyFileReader  ff = null;
 		ArrayList<String> lines =  new ArrayList<String>();
 		try {
-			BufferedReader bufferedReader = new BufferedReader(new FileReader(strFilename));
+			String strCurDir = System.getProperty("user.dir");  // current directory!
+			String strFile = strCurDir + File.separator + strFilename;
+
+			BufferedReader bufferedReader = new BufferedReader(new FileReader(strFile));
 			
 			int last = -1; //last comment char
 			
