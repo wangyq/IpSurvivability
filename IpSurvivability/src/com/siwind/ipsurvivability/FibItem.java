@@ -60,7 +60,7 @@ public class FibItem {
 
 		NextHop hop = new NextHop();
 		hop.setHop(hopmain);
-		hop.setType(NextHop.HOP_MAIN);
+		hop.setType(NextHop.Type.MAIN);
 		hop.setMetric(graph.getShortestPathMetric(src, dst));
 
 		// add main next hop!
@@ -72,20 +72,20 @@ public class FibItem {
 
 		for (int i = 0; i < adj.size(); i++) {
 			NextHop pp = null;
-			int node = adj.get(i); // adjacency
+			int node = adj.get(i); // direct adjacency node!
 
 			if (node == hopmain) {
 				continue;
-			} else if (node == dst) { // it is a link protected lfa
+			} else if (node == dst) { // it is a direct link protected lfa
 				pp = new NextHop();
 				pp.setHop(node);
-				pp.setType(NextHop.HOP_LFA_LINK);
-				pp.setMetric(0);
+				pp.setType(NextHop.Type.DIRECT);
+				pp.setMetric(graph.getShortestPathMetric(src,dst));     //here is the real metric from src to dst.
 			} else {
 
 				Vector<Integer> path_adj = graph.getShortestPathByIndex(node, dst); // path!!
-				int type = NextHop.makeType(src, path, path_adj);
-				if (type == NextHop.HOP_UNKOWN)
+				NextHop.Type type = NextHop.makeType(src, path, path_adj);
+				if (type == NextHop.Type.UNKOWN)
 					continue;
 
 				pp = new NextHop();
