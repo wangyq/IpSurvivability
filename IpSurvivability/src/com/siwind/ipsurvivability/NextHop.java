@@ -21,17 +21,26 @@ public class NextHop {
 		/**
 		 * 标记类型的字符, 为类型的首字母
 		 */
-		private String mark;
+		private static String[] mark = null;
+		
+		static{
+			Type[] values = Type.values();
+			mark = new String[values.length];
+			for(Type type : values){
+				//mark[i] = values[i].name().substring(0,1);
+				mark[type.ordinal()] = type.name().substring(0,1);
+			}
+		}
 
 		/**
 		 * 构造函数必须为私有
 		 */
 		private Type(){
-			mark = this.name().substring(0,1);
 		}
 
 		public String getMark(){
-			return mark;
+			//return this.name().substring(0,1);   //会生成很多对象的
+			return mark[this.ordinal()];
 		}
 	}
 
@@ -123,15 +132,11 @@ public class NextHop {
 			public int compare(NextHop o1, NextHop o2) {
 				// TODO Auto-generated method stub
 				int ret = 0; //equal!
-				if (!o1.type.equals(o2.type)) { // higher type number get lower
-					ret = o1.type.compareTo(o2.type);  // priority
-				}else if (o2.metric > o1.metric) { // larger metric get
-													// lower priority!
-					ret = -1;
-				} else if( o2.metric < o1.metric ){
-					ret = 1;
-				} 
-
+				
+				ret = o1.type.compareTo(o2.type);  // whether the same type!
+				if( ret == 0 ){//if type is same, so we compare the metric
+					ret = o1.metric - o2.metric;  //so if metric is the same , how ?
+				}
 				return ret;
 			}
 		};
