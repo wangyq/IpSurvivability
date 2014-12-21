@@ -50,15 +50,7 @@ public class LFA {
 		FibTable.printTables(graph,tbls);
 	}
 	
-	public static void testHopMemory(){
-		int maxlen = 1000000;
-		String str = "";
-		NextHop hops[] = new NextHop[maxlen];
-		for(int i=0;i<maxlen;i++){
-			hops[i] = new NextHop();
-			str = hops[i].getType().getMark();
-		}
-	}
+
 	/**
 	 * @param args
 	 */
@@ -68,8 +60,7 @@ public class LFA {
 		//testShortestPath();
 		//testDirectGraph();
 		
-		testHopMemory();
-		
+	
 		System.out.println(System.getProperty("user.dir"));
 	}
 
