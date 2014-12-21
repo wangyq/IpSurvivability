@@ -25,7 +25,7 @@ public class FileUtil {
 	protected static int indexOfComment(String line, String comments){
 		int index = -1 ;
 		if( (line == null) || line.isEmpty() ) return index;
-		if( comments == null ) return index;
+		if( comments == null || comments.isEmpty() ) return index;
 		
 		if( comments.length() == 1 ) {
 			index = line.indexOf(comments);
