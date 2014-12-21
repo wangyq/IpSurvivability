@@ -32,8 +32,10 @@ public class FileUtil {
 		} else{
 			for(int i=0;i<line.length();i++){
 				char ch = line.charAt(i);
-				index = comments.indexOf(ch);
-				if( index != -1 ) break;   //find comment char now!
+				if( comments.indexOf(ch) != -1 ){
+					index = i;  //find comment location!
+					break;   //find comment char now!
+				}
 			}
 		}
 		

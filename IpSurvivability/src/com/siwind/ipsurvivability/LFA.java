@@ -15,7 +15,7 @@ public class LFA {
 	 */
 	public static boolean testReadData(){
 		boolean bOK = false;
-		ArrayList<String> ff = FileUtil.getFileContents("data.txt");
+		ArrayList<String> ff = FileUtil.getFileContents("data.txt", "#;");
 		for( String str: ff){
 				System.out.println(str);
 		}
@@ -55,11 +55,13 @@ public class LFA {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
+		//testReadData();
+		
 		//testShortestPath();
 		testDirectGraph();
 		
 	
-		System.out.println(System.getProperty("user.dir"));
+		//System.out.println(System.getProperty("user.dir"));
 	}
 
 }
