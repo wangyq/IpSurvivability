@@ -2,9 +2,10 @@ package com.siwind.ipsurvivability;
 
 import java.io.IOException;
 import java.net.NetworkInterface;
+import java.util.ArrayList;
 import java.util.Vector;
 
-import com.siwind.tools.MyFileReader;
+import com.siwind.tools.FileUtil;
 
 public class LFA {
 
@@ -14,12 +15,9 @@ public class LFA {
 	 */
 	public static boolean testReadData(){
 		boolean bOK = false;
-		MyFileReader ff = MyFileReader.readFile("data.txt");
-		if( null != ff ){
-			while( ff.hasNext() ){
-				String lineString = ff.next();
-				System.out.println(lineString);
-			}
+		ArrayList<String> ff = FileUtil.getFileContents("data.txt");
+		for( String str: ff){
+				System.out.println(str);
 		}
 		return bOK;
 	}
@@ -58,7 +56,7 @@ public class LFA {
 		// TODO Auto-generated method stub
 
 		//testShortestPath();
-		//testDirectGraph();
+		testDirectGraph();
 		
 	
 		System.out.println(System.getProperty("user.dir"));

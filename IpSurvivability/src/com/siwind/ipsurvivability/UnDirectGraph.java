@@ -3,7 +3,7 @@ package com.siwind.ipsurvivability;
 import java.util.ArrayList;
 import java.util.Vector;
 
-import com.siwind.tools.MyFileReader;
+import com.siwind.tools.FileUtil;
 
 /**
  * 
@@ -44,11 +44,12 @@ public class UnDirectGraph extends Graph{
 		int[][] m = null;
 		UnDirectGraph graph = null;
 		
-		MyFileReader ff = MyFileReader.readFile(filename);
-		if( null != ff ){
-			String line = ff.next();
+		ArrayList<String> ff = FileUtil.getFileContents(filename);
+		if( ff.size() >=1 ){
+			String line = ff.get(0);
 			//System.out.println(line);
 			//line NO.1 is nodenum nodename nodename ...
+			
 			String[] n = line.split(" ");
 			int num = Integer.parseInt(n[0]);
 			if( num != (n.length-1) ) {
@@ -60,8 +61,8 @@ public class UnDirectGraph extends Graph{
 			m = new int[num][num];
 			
 			int index = 0;
-			while( ff.hasNext() ){ //read every line of weigh
-				line = ff.next();
+			for( int j=1; j<ff.size(); j++){ //read every line of weigh
+				line = ff.get(j);
 				n = line.split(" ");
 				for(int i=0; i<n.length;i++){
 					m[index][i+index] = Integer.parseInt(n[i]);
