@@ -54,7 +54,6 @@ public class FileUtil {
 	 */
 	public static ArrayList<String> getFileContents(String strFilename, String comments){
 		String strLine =  "";
-		FileUtil  ff = null;
 		ArrayList<String> lines =  new ArrayList<String>();
 		BufferedReader bufferedReader = null;
 		try {
