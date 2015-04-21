@@ -193,7 +193,13 @@ public class Graph {
 		// 计算最短路径及路径信息i->j
 		for (k = 0; k < nodeNum; k++) {
 			for (i = 0; i < nodeNum; i++) {
+
+				if( i==k ) continue;
+
 				for (j = 0; j < nodeNum; j++) {
+
+					if( j==k ) continue;
+
 					int tmp = oldmatrix[i][k] + oldmatrix[k][j];   //
 					if (oldmatrix[i][j] > tmp) {
 						oldmatrix[i][j] = tmp;
