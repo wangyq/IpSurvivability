@@ -80,6 +80,8 @@ class FixNode{
 
         int upbound = getLessBranchSize();
         int start = getIPFragment(ipaddr,masklen);
+        int index = start <<(branch-masklen); // nexthop index to be modify!
+
         stack.push(start);
 
         while( ! stack.empty() ){
