@@ -15,6 +15,22 @@ public class BinTree<T> {
 
     }
 
+    public static void printFullArrayBinTree(int depth){
+        if( depth<=0 ) return;
+        int span = 4;
+        int gap = 1;
+
+        int index = 0;
+        int i,j;
+        for( i=1;i<=depth;i++){
+            //out span space!
+            for(j=0;j<(depth-i)*span;j++) System.out.print(" ");
+                for (j = 0; j < (1 << i ); j++, index++) {
+                    System.out.print(index + " ");
+                }
+                System.out.println();
+        }
+    }
     /**
      *
      */
@@ -35,7 +51,10 @@ public class BinTree<T> {
      * @param args
      */
     public static void main(String[] args) {
+
         test_tree();
+
+        printFullArrayBinTree(8);
     }
 
     public TreeNode<T> getRoot(){

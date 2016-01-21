@@ -24,10 +24,14 @@ public class Stack<T> {
      * @param incSize
      */
     public Stack(int initSize, int incSize){
-        initSize = incSize>0? incSize:INIT_SIZE;
+        initSize = initSize>0? initSize:INIT_SIZE;
+        incSize = initSize>0? incSize:INC_SIZE;
+
         this.data = new Object[initSize];
         this.incSize = incSize;
         headPtr = 0;
+
+        //System.out.println("Stack initsize = "+ initSize);
     }
 
     public boolean isEmpty(){
@@ -50,6 +54,8 @@ public class Stack<T> {
             Object[] newData = new Object[data.length+incSize];
             System.arraycopy(data,0,newData,0,data.length);  //copy array!
             this.data = newData;
+
+            //System.out.println("Stack resize = "+ this.data.length);
         }
         this.data[headPtr++] = val;
         return val;
