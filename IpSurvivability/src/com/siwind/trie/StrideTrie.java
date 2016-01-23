@@ -20,14 +20,18 @@ public class StrideTrie {
     protected int m_total=0;       //total rib entry!
 
     protected void init(){
+        init(null);
+    }
+    protected void init(int[] steps){
         m_total = 0;
+        if( steps!=null ){
+            m_steps = new int[steps.length];
+            System.arraycopy(steps,0,m_steps,0,steps.length);
+        }
         m_root = new FixNode(new StrideTrieScheme(m_steps));
     }
     public StrideTrie(int... args){
-        m_steps = new int[args.length];
-        System.arraycopy(args,0,m_steps,0,args.length);
-
-        init();
+        init(args);
     }
 
     public boolean addEntry(int ipaddr, int masklen,int nhop){
@@ -109,6 +113,13 @@ public class StrideTrie {
         return true;
 
     }
+
+    /**
+     * clear [step step step step ...]
+     * @param strCmd
+     * @param trie
+     * @return
+     */
     public static boolean clearCmd(String strCmd, StrideTrie trie){
 
         try{
@@ -117,8 +128,14 @@ public class StrideTrie {
             String[] strs = strCmd.split("\\s+");
             if( strs[0].compareTo("clear")!=0 ) return false;
 
+            int[] steps = null;
+            if( strs.length>1 ){
+                steps = new int[strs.length-1];
+                for(int i=0;i<steps.length;i++) steps[i] = Integer.parseInt(strs[i+1]);
+            }
+
             FixNode.deReferenceAll(trie.m_root);
-            trie.init();
+            trie.init(steps);
 
             System.out.println("Total entries is : " + trie.m_total);
 
@@ -315,7 +332,36 @@ public class StrideTrie {
         return true;
 
     }
+    public static boolean infoCmd(String strCmd, StrideTrie trie){
 
+        try{
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("info")!=0 ) return false;
+
+            TrieInfo data = FixNode.info(trie.m_root);
+
+            int total = data.next + data.nhop + data.bitSet + data.lhop;
+            float ratio = (float) (((data.entry)*100.0)/total);
+
+            String strFormat  = "%10s %16s %16s %10s %15s %16s %20f";
+            String strFormat1 = "%10s %16s %16s %10s %15s %16s %20s";
+            System.out.println(String.format(strFormat1,"Entry","nexthop","next","bitSet","lhop","TOTAL","Entry/Total(%)"));
+
+            System.out.println(String.format(strFormat,data.entry,data.nhop,data.next,data.bitSet,data.lhop,total,ratio));
+
+            System.out.print("Scheme = ( ");
+            for(int i=0;i<trie.m_steps.length;i++ ) System.out.print(trie.m_steps[i] + " ");
+            System.out.println(" )");
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+
+    }
     public static String readLine(){
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in ));
 
@@ -334,10 +380,11 @@ public class StrideTrie {
         String strMenu = "Available command are: \n" +
                 "add [ipaddr/masklen] via [nexthop] \n" +
                 "del [ipaddr/masklen] \n" +
-                "clear  \n" +
+                "clear [step step step step ...]  \n" +
                 "load [file] [maxLine]\n" +
                 "save [file] \n" +
                 "show [ipaddr/masklen] \n" +
+                "info \n" +
                 "help | ? \n" +
                 "exit | quit \n" +
                 "";
@@ -377,6 +424,9 @@ public class StrideTrie {
             }else if(strCmd.compareTo("show") == 0 ){
                 showCmd(strLine,trie);
 
+            }else if(strCmd.compareTo("info") == 0 ){
+                infoCmd(strLine,trie);
+
             }else if( (strCmd.compareTo("help") == 0) || (strCmd.compareTo("?") == 0) ){
                 System.out.println(strMenu);
             } else{
@@ -401,7 +451,7 @@ public class StrideTrie {
 
     }
     public static void runTrie(){
-        int[] steps={8,8,8,8};
+        int[] steps={16,8,4,4};
         StrideTrie trie = new StrideTrie(steps);
 
         //StrideTrie trie = new StrideTrie(16,8,4,4);
@@ -718,6 +768,26 @@ class FixNode{
         return node;
     }
 
+    protected TrieInfo getInfo(){
+        TrieInfo val = new TrieInfo();
+
+        val.next = this.getBranchSize();
+        val.nhop = this.getBranchSize();
+        val.lhop = (this.lhop!=null)?this.getLessBranchSize():0;
+        val.bitSet = this.getBranchSize() >>> 5; //2^6 = 64; a long, which consists of 64 bits, and a int which consists of 32 bits
+
+        val.entry = 0;
+        if( this.lhop!=null) {
+            for (int i = 0; i < this.getLessBranchSize(); i++) {
+                if( this.lhop[i]!=0 ) val.entry++;
+            }
+        }
+        for(int i=0;i<this.getBranchSize();i++){
+            if( this.isRib.get(i) ) val.entry++;
+        }
+        return val;
+    }
+
     protected int printRoute(int baseIP,int baseMasklen,String strFormat, PrintStream out){
         int i,j,count,index;
         int ip,ipmask,ipmasklen,hop;
@@ -822,6 +892,33 @@ class FixNode{
         return num;
     }
 
+    /**
+     *
+     * @param root
+     */
+    public static TrieInfo info(FixNode root){
+        TrieInfo data = new TrieInfo();
+
+        if( root==null ) return data;
+
+        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
+
+        queue.push(root);
+
+        do {
+            FixNode node = queue.pop();  //
+
+            data.add(node.getInfo());
+
+            for(int i=0;i<node.getBranchSize();i++){
+                if( node.next[i]!=null ) queue.push(node.next[i]);
+            }
+
+        }while(!queue.isEmpty());
+
+        return data;
+    }
+
     public static int show(FixNode root){
         return show(root,0,0);
     }
@@ -841,8 +938,11 @@ class FixNode{
 
         FixNode node = root;
 
+        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
+
         if( masklen>0 ) {
-            while ( ( node!=null ) && (node.branch < masklen) ){
+            //node = queryNode(root, ipaddr, masklen); //and new masklen
+            while ( ( node!=null ) && (masklen > node.branch) ){
                 baseMasklen += node.branch; //new baseMasklen
 
                 masklen -= node.branch;
@@ -852,19 +952,36 @@ class FixNode{
 
                 ipaddr = (ipaddr<<node.branch); //new ip address
 
-
                 node = node.next[index];
-
             }
-            //node = queryNode(root, ipaddr, masklen); //and new masklen
+            if( (node!=null ) && (masklen== node.branch) ){
+                int index = node.getIPFragmentOffset(ipaddr,node.branch);
+
+                if( node.nhop[index] !=0 ){//found!
+                    int hop = node.nhop[index];
+                    int ipmasklen = baseMasklen + node.branch;
+                    int ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);
+
+                    int ip = (baseIP<<node.branch) + index;
+                    ip = ip<<(32-ipmasklen);
+
+                    System.out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                }
+                node = node.next[index];
+                if( node!= null ) {
+                    baseMasklen += node.branch; //new baseMasklen
+                    baseIP = (baseIP << node.branch) + index; //new baseIP
+                    ipaddr = (ipaddr << node.branch); //new ip address
+                }
+            }
+
         }
+
         if( node==null ) return 0;
 
         ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
         queue.push(new TrieVisit(node,baseIP,baseMasklen));
         TrieVisit nodeVisit;
-
-        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
 
         do {
             num ++;
@@ -899,7 +1016,7 @@ class StrideTrieScheme {
      * @param steps
      */
     public StrideTrieScheme(int[] steps){
-        if( steps.length<=0 ){
+        if( (steps==null) || (steps.length<=0) ){
             throw new InvalidParameterException("scheme such as '8-8-8-8',... ");
         }
         m_steps = new int[steps.length];
@@ -922,6 +1039,28 @@ class StrideTrieScheme {
     public int nextStride(){
         if( index>= m_steps.length ) return 0;
         return m_steps[index++];
+    }
+}
+
+class TrieInfo{
+    public int next;
+    public int nhop = 0;
+    public int lhop = 0;
+    public int bitSet = 0;
+    public int entry = 0;
+
+    public TrieInfo(){
+
+    }
+
+    public TrieInfo add(TrieInfo val){
+        this.next += val.next;
+        this.nhop += val.nhop;
+        this.lhop += val.lhop;
+        this.bitSet += val.bitSet;
+        this.entry += val.entry;
+
+        return this;
     }
 }
 
