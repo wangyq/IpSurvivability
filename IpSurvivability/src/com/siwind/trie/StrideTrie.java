@@ -4,11 +4,11 @@ package com.siwind.trie;
 import com.siwind.tools.ArrayQueue;
 import com.siwind.tools.IPv4Util;
 import com.siwind.tools.Stack;
+import com.siwind.tools.Util;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.security.InvalidParameterException;
+import java.util.BitSet;
 
 /**
  * Created by wang on 16-1-8.
@@ -17,23 +17,40 @@ public class StrideTrie {
 
     protected int[] m_steps;
     protected FixNode m_root;
+    protected int m_total=0;       //total rib entry!
 
+    protected void init(){
+        m_total = 0;
+        m_root = new FixNode(new StrideTrieScheme(m_steps));
+    }
     public StrideTrie(int... args){
         m_steps = new int[args.length];
         System.arraycopy(args,0,m_steps,0,args.length);
-        m_root = new FixNode(new StrideTrieScheme(m_steps));
+
+        init();
     }
 
     public boolean addEntry(int ipaddr, int masklen,int nhop){
-        return m_root.updateEntry(ipaddr,masklen,nhop,false,new StrideTrieScheme(m_steps)); //not delete
+        if( masklen<=0 || masklen>32 ) return false;
+        StrideTrieScheme scheme = new StrideTrieScheme(m_steps);
+        scheme.nextStride();
+
+        int oldHop =  m_root.addEntry(ipaddr,masklen,nhop,scheme); //not delete
+        if( oldHop ==0 ){
+            m_total ++ ; //add success!
+        }
+        return true;
     }
     public boolean delEntry(int ipaddr, int masklen){
-        return m_root.updateEntry(ipaddr,masklen,0,true,null); //not delete
+        if( masklen<=0 || masklen>32 ) return false;
+
+        int oldHop = m_root.delEntry(ipaddr,masklen,0); //not delete
+        if( oldHop!=0 ){
+            m_total --; //del success!
+        }
+        return true;
     }
 
-    public void show(){
-
-    }
     /**
      * add [ipaddr/masklen] via [nexthop]
      * @param strCmd
@@ -42,7 +59,7 @@ public class StrideTrie {
     public static boolean addCmd(String strCmd,StrideTrie trie){
         try{
             if( strCmd.isEmpty() ) return false;
-            String[] strs = strCmd.split(" ");
+            String[] strs = strCmd.split("\\s+");
             if( strs[0].compareTo("add")!=0 ) return false;
             int[] ips = new int[2];
             //get ip address and netmasklen
@@ -54,9 +71,11 @@ public class StrideTrie {
 
             trie.addEntry(ips[0],ips[1],nhop);
 
+            System.out.println("Total entries is : " + trie.m_total);
+
         }catch (Exception ex){
             System.out.println(strCmd + " failed!");
-            ex.printStackTrace();
+            //ex.printStackTrace();
             return false;
         }
         return true;
@@ -73,13 +92,192 @@ public class StrideTrie {
         try{
 
             if( strCmd.isEmpty() ) return false;
-            String[] strs = strCmd.split(" ");
+            String[] strs = strCmd.split("\\s+");
             if( strs[0].compareTo("del")!=0 ) return false;
             int[] ips = new int[2];
             //get ip address and netmasklen
             if( !IPv4Util.IPandMasklenfromStr(strs[1],ips) ) return false;
 
             trie.delEntry(ips[0],ips[1]);
+            System.out.println("Total entries is : " + trie.m_total);
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+
+    }
+    public static boolean clearCmd(String strCmd, StrideTrie trie){
+
+        try{
+
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("clear")!=0 ) return false;
+
+            FixNode.deReferenceAll(trie.m_root);
+            trie.init();
+
+            System.out.println("Total entries is : " + trie.m_total);
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+
+    }
+    /**
+     *
+     * @param trie
+     * @param strFile
+     * @param maxNum: number record to read in. 0 means read total file.
+     * @return
+     */
+    public static boolean loadFromFile(StrideTrie trie,String strFile, int maxNum){
+
+        boolean bOK = false;
+        int num = 0; //
+        BufferedReader in = null;
+        String line="";
+        try
+        {
+            in=new BufferedReader(new FileReader(strFile));
+
+            while ((line=in.readLine() )!=null)
+            {
+                //System.out.println(line);
+                line=line.trim();
+                if( line.isEmpty() ) continue;
+
+                String[] strs = line.trim().split("\\s+");
+                if( strs.length<3) continue; //wrong format!
+
+                if( !IPv4Util.isIPv4Valid(strs[0])) continue;
+                int ip = IPv4Util.IPfromStr(strs[0]);
+                int masklen = Integer.parseInt(strs[1]);
+                int nhop = Integer.parseInt(strs[2]);
+
+                trie.addEntry(ip,masklen,nhop);
+
+                if( maxNum>0 ){
+                    num++;
+                    if( num>=maxNum ){  //read finished!
+                        break;
+                    }
+                }
+            }
+
+            bOK = true;
+        } catch (Exception e)
+        {
+            e.printStackTrace();
+            System.out.println("Load file error : " + line);
+
+        }finally {
+            try {
+                if( in!=null ) in.close();
+            }catch (IOException ex){
+
+            }
+        }
+
+        return bOK;
+    }
+
+    public static boolean saveToFile(StrideTrie trie,String strFile){
+
+        boolean bOK = false;
+        File file = null;
+        PrintStream ps = null;
+        try
+        {
+            file = new File(strFile);
+
+            ps = new PrintStream(new FileOutputStream(file));
+
+            FixNode.saveToFile(trie.m_root,ps);
+
+            bOK = true;
+        } catch (Exception e)
+        {
+            e.printStackTrace();
+            System.out.println("Save file error : " + strFile);
+
+        }finally {
+            try {
+                if( ps!=null ) ps.close();
+            }finally {
+
+            }
+
+        }
+
+        return bOK;
+    }
+    /**
+     * load [file]
+     * and file line is:
+     *     x.x.x.x/y
+     *
+     * @param strCmd
+     * @param trie
+     * @return
+     */
+    public static boolean loadCmd(String strCmd, StrideTrie trie){
+
+        try{
+
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("load")!=0 ) return false;
+
+            String strFile = strs[1];
+            if( strFile.charAt(0) != '/'){
+                strFile = Util.getCurDir() + strFile;
+            }
+            int maxNum = 0;
+            if( strs.length>=3 ){
+                maxNum = Integer.parseInt(strs[2]);
+            }
+            //System.out.println("Current Directory: " + Util.getCurDir());
+
+            loadFromFile(trie,strFile,maxNum);
+
+            System.out.println("Total entries is : " + trie.m_total);
+
+            //get ip address and netmasklen
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            ex.printStackTrace();
+            return false;
+        }
+        return true;
+
+    }
+    public static boolean saveCmd(String strCmd, StrideTrie trie){
+
+        try{
+
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("save")!=0 ) return false;
+
+            String strFile = strs[1];
+            if( strFile.charAt(0) != '/'){
+                strFile = Util.getCurDir() + strFile;
+            }
+
+            saveToFile(trie,strFile);
+
+            System.out.println("Save to File completed! Total entries is " + trie.m_total);
+
+            //get ip address and netmasklen
+
         }catch (Exception ex){
             System.out.println(strCmd + " failed!");
             ex.printStackTrace();
@@ -92,13 +290,26 @@ public class StrideTrie {
 
         try{
             if( strCmd.isEmpty() ) return false;
-            if( strCmd.compareTo("show")!=0 ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("show")!=0 ) return false;
 
-            //trie.delEntry(ips[0],ips[1]);
-            FixNode.show(trie.m_root); //show
+            int[] ips = {0,0};
+            if( strs.length>=2 ) {
+                //get ip address and netmasklen
+                if (!IPv4Util.IPandMasklenfromStr(strs[1], ips)) {
+                    throw new InvalidParameterException("Command parameter wrong!");
+                    //return false;
+                }
+            }
+
+            int num = FixNode.show(trie.m_root,ips[0],ips[1]); //show
+            System.out.println("Number nodes to show : " + num);
+
+            System.out.println("Total entries is : " + trie.m_total);
+
         }catch (Exception ex){
             System.out.println(strCmd + " failed!");
-            ex.printStackTrace();
+            //ex.printStackTrace();
             return false;
         }
         return true;
@@ -118,13 +329,15 @@ public class StrideTrie {
         //System.out.println("ÊäÈëÊý¾Ý£º"+read);
         return strLine;
     }
-    public static void showMenu(){
-        StrideTrie trie = new StrideTrie(8,8,8,8);
+    public static void showMenu(StrideTrie trie){
 
         String strMenu = "Available command are: \n" +
                 "add [ipaddr/masklen] via [nexthop] \n" +
                 "del [ipaddr/masklen] \n" +
-                "show \n" +
+                "clear  \n" +
+                "load [file] [maxLine]\n" +
+                "save [file] \n" +
+                "show [ipaddr/masklen] \n" +
                 "help | ? \n" +
                 "exit | quit \n" +
                 "";
@@ -141,7 +354,9 @@ public class StrideTrie {
             strLine = strLine.trim();
             strLine.toLowerCase();
 
-            strCmd = strLine.split(" ")[0];
+            strCmd = strLine.split("\\s+")[0];
+
+            System.out.println("Out[" + (iTotal++) + "]: ");
 
             if( (strCmd.compareTo("quit") == 0) || (strCmd.compareTo("exit")==0) ) break;
             else if(strCmd.compareTo("add") == 0 ){
@@ -149,6 +364,15 @@ public class StrideTrie {
 
             }else if(strCmd.compareTo("del") == 0 ){
                 delCmd(strLine,trie);
+
+            }else if(strCmd.compareTo("clear") == 0 ){
+                clearCmd(strLine,trie);
+
+            }else if(strCmd.compareTo("load") == 0 ){
+                loadCmd(strLine,trie);
+
+            }else if(strCmd.compareTo("save") == 0 ){
+                saveCmd(strLine,trie);
 
             }else if(strCmd.compareTo("show") == 0 ){
                 showCmd(strLine,trie);
@@ -167,16 +391,22 @@ public class StrideTrie {
      */
     public static void main(String[] args) {
         //test_FixNode();
-        showMenu();
-        System.out.println('9' - '4');
+        runTrie();
+        //System.out.println('9' - '4');
     }
 
     //======================
     public static void test_FixNode(){
         FixNode.travelPreOrder(8,0);
 
-        StrideTrie trie = new StrideTrie(8,8,8,8);
+    }
+    public static void runTrie(){
+        int[] steps={8,8,8,8};
+        StrideTrie trie = new StrideTrie(steps);
 
+        //StrideTrie trie = new StrideTrie(16,8,4,4);
+
+        showMenu(trie);
     }
 }
 
@@ -188,6 +418,7 @@ class FixNode{
     protected int skip_len = 0;
 
     protected FixNode[] next = null;
+    protected BitSet isRib = null;
     protected int nhop[] = null;  //the size is 2^branch
     protected int lhop[] = null;  //the size is 2^brach - 2
 
@@ -219,6 +450,7 @@ class FixNode{
         this.branch = ((branch>=0)&&(branch<32))?branch:0;
         this.next = new FixNode[getBranchSize()];  //next pointer table!
         this.nhop = new int[getBranchSize()];      //next hop items, maybe using lazi-allocation
+        this.isRib = new BitSet(getBranchSize());  //if Rib is here!
 
         //skip
         this.skip_len = ((skip_len>=0)&&(skip_len<32))?skip_len:0;
@@ -275,6 +507,7 @@ class FixNode{
         int ip = getIPFragment(ipaddr,fragmentlen);
         return ip>>>(32-branch);
     }
+
     public static int getIPFragment(int ipaddr, int fragmentlen){
         if( fragmentlen<=0 ) return 0;
         if( fragmentlen>=32 ) return ipaddr;
@@ -314,43 +547,49 @@ class FixNode{
      */
     protected void travelPreOrderUpdateLHop(int nodeID, int masklen, int nhop){
 
-        if( masklen>= branch ) return;//?
+        //if( masklen>= branch ) return;//?
 
         //int nodeID = prefix + ((1<<masklen)-2);
 
         int level = masklen;
-
-        Stack<Integer> st = new Stack<Integer>(branch -level +4);  //initail size must less than branch-level.
-
-        int index = nodeID;
         int bound = (1<<(branch-1)) -2;  //getLessBranchSize();
-
-        int start = getNodeStartIndex(nodeID);
-        int end = start;
         int i = 0;
-        do {
-            if( (index<bound) && (this.lhop[index]==0) ){// not reach leaf!
-                index = 2*index +2;  //goto left node!
-                st.Push(index+1);    //right node push stack.
 
-            } else{// if((index<bound) && (this.lhop[index]!=0)){
-                if( (index>=bound) && (this.lhop[index] == 0) ) {//need update!
-                    end = getNodeEndIndex(index)+1;
-                    for (i = start; i < end; i++) {
-                        this.nhop[i] = nhop;  //update next hop!
+        if( nodeID>=bound ){ //here do NOT need go through child node
+            if( this.lhop[nodeID] !=0 ){
+                i = (nodeID<<1) + 4 - (1<<branch);//getNodeStartIndex(nodeID); //
+                if( !this.isRib.get(i)) this.nhop[i] = nhop;
+                if( !this.isRib.get(i+1)) this.nhop[i] = nhop;
+            }
+        }else {//travel from left to right sub-tree
+
+            int index = (nodeID<<1) + 2; //left child!
+
+            Stack<Integer> st = new Stack<Integer>(branch -level +4);  //initail size must less than branch-level.
+
+            st.Push(index+1); //right child push into stack
+
+            do {
+                if ((index < bound) && (this.lhop[index] == 0)) {// not reach leaf!
+                    index = (index<<1) + 2 ;//2 * index + 2;  //goto left node!
+                    st.Push(index + 1);    //right node push stack.
+
+                } else {// if((index<bound) && (this.lhop[index]!=0)){
+                    if ((index >= bound) && (this.lhop[index] == 0)) {//need update!
+                        i = (index<<1) + 4 - (1<<branch);
+                        if( !this.isRib.get(i)) this.nhop[i] = nhop;
+                        if( !this.isRib.get(i+1)) this.nhop[i] = nhop;
                     }
-                }
 
-                start = getNodeEndIndex(index) +1; //update start index.
+                    if (!st.isEmpty()) {
+                        index = st.Pop();
+                    } else {
+                        break;  // end travel now!
+                    }
+                } //end if!
 
-                if (!st.isEmpty() ){
-                    index = st.Pop();
-                } else{
-                    break;  // end travel now!
-                }
-            } //end if!
-
-        }while (true);
+            } while (true);
+        }
     }
 
 
@@ -359,68 +598,137 @@ class FixNode{
      * @param ipaddr
      * @param masklen
      * @param nhop
+     * @return the old Next hop
+     */
+    protected int updateEntry(int ipaddr, int masklen, int nhop,boolean bDel, StrideTrieScheme scheme){
+        //if( masklen<=0 || masklen>32 ) return false;
+        int oldHop = 0;
+
+
+
+        return oldHop;
+    }
+
+    /**
+     *
+     * @param ipaddr
+     * @param masklen
+     * @param nhop
      * @return
      */
-    public boolean updateEntry(int ipaddr, int masklen, int nhop,boolean bDel, StrideTrieScheme scheme){
-        if( masklen<=0 ) return false;
-
+    public int delEntry(int ipaddr, int masklen, int nhop){
+        int oldHop = 0;
         int ip = getIPFragmentOffset(ipaddr,branch);
 
-        if(masklen < branch ){
-            if( lhop==null ){ //lazy init!
-                this.lhop = new int[this.getLessBranchSize()];
-            }
-
-            int nodeID = getNodIDfromOffset(ip,masklen);
-
-            if( (bDel && this.lhop[nodeID]!=0) || !bDel ){
-                travelPreOrderUpdateLHop((nodeID<<1)+2,masklen+1,nhop);
-                travelPreOrderUpdateLHop((nodeID<<1)+3,masklen+1,nhop);
-
-                this.lhop[nodeID] = nhop;  //mark being added
-            }
-
-        }else {//masklen > branch
-
-            //this.nhop[ip] = nhop;
-            if( masklen == branch ){
-                this.nhop[ip] = nhop;
-            }
-            else {//( masklen>branch )
-
-                int newIP = ipaddr<<branch;
+        if( masklen>branch ){
+            if(this.next[ip]!=null) {
+                int newIP = ipaddr << branch;
                 int newMasklen = masklen - branch;
 
-                if( !bDel ) {
-                    //only when is add entry!
-                    int step = scheme.nextStride();  //move to next stride trie.
+                oldHop = this.next[ip].delEntry(newIP, newMasklen, nhop);
+            }
 
-                    if ((this.next[ip] == null)) {
-                        this.next[ip] = new FixNode(step);  //next fix stride trie!
-                    }
-                    this.next[ip].updateEntry(newIP, newMasklen, nhop, bDel,scheme);
-                } else if( this.next[ip]!=null){ //bDel is true!
-                    this.next[ip].updateEntry(newIP, newMasklen, nhop, bDel,scheme);
+        }else if( masklen==branch ){ //
+            if(this.nhop[ip]!=0) {
+                oldHop = this.nhop[ip];
+                this.nhop[ip] = 0;
+                this.isRib.clear(ip); //clear the rib info!
+            }
+
+        }else { //( masklen < branch){
+            if(this.lhop!=null) {
+                int nodeID = getNodIDfromOffset(ip, masklen);
+
+                oldHop = this.lhop[nodeID]; //
+
+                if (oldHop != 0) {
+                    travelPreOrderUpdateLHop(nodeID, masklen, 0);
+                    this.lhop[nodeID] = 0;  //mark being deleted
                 }
             }
         }
-
-        return true;
+        return oldHop;
     }
 
-    protected void printRoute(int baseIP,int baseMasklen,String strFormat){
+    /**
+     *
+     * @param ipaddr
+     * @param masklen
+     * @param nhop
+     * @param scheme
+     * @return
+     */
+    public int addEntry(int ipaddr, int masklen, int nhop,StrideTrieScheme scheme){
+        int oldHop = 0;
+        int ip = getIPFragmentOffset(ipaddr,branch);
+
+        if( masklen>branch ){// go through next level trie-node!
+            int newIP = ipaddr<<branch;
+            int newMasklen = masklen - branch;
+
+            int step = scheme.nextStride();  //move to next stride trie.
+
+            if ((this.next[ip] == null)) {
+                this.next[ip] = new FixNode(step);  //next fix stride trie!
+            }
+            oldHop = this.next[ip].addEntry(newIP,newMasklen,nhop,scheme);
+
+        }else if( masklen==branch ){
+
+            if( this.isRib.get(ip) ){// here old next hop is valid!
+                oldHop = this.nhop[ip]; //old next hop
+            } else{
+                this.isRib.set(ip);  //set rib mark!
+            }
+
+            if( this.nhop[ip] != nhop ){
+                this.nhop[ip] = nhop;
+            }
+        }else { //( masklen < branch){
+            if( this.lhop==null ){ //lazy init!
+                this.lhop = new int[this.getLessBranchSize()];
+            }
+            int nodeID = getNodIDfromOffset(ip,masklen);
+
+            oldHop = this.lhop[nodeID]; //zero or last rib entry!
+
+            if( this.lhop[nodeID] != nhop ) { //add new next hop!
+                //oldHop = this.lhop[nodeID]; //
+                travelPreOrderUpdateLHop(nodeID, masklen, nhop);
+                this.lhop[nodeID] = nhop;  //mark being added
+            }
+        }
+        return oldHop;
+    }
+
+    public static FixNode queryNode(FixNode root, int ipaddr, int masklen){
+        if( (null == root) || (masklen<=0) ) return root;
+
+        FixNode node = root;
+
+        while ( ( node!=null ) && (node.branch < masklen) ){
+            masklen -= node.branch;
+            int index = node.getIPFragmentOffset(ipaddr,node.branch);
+            ipaddr = (ipaddr<<node.branch); //new ip address
+
+            node = node.next[index];
+
+        }
+
+        return node;
+    }
+
+    protected int printRoute(int baseIP,int baseMasklen,String strFormat, PrintStream out){
         int i,j,count,index;
         int ip,ipmask,ipmasklen,hop;
+        int num = 0;
 
         count = 1;
         index = 0; //nodID
-        int[] nhop = this.nhop; //
+
+        baseIP = (baseIP<<branch);
 
         if( lhop!= null) {
-
-            nhop = new int[this.nhop.length];
-            System.arraycopy(this.nhop,0,nhop,0,this.nhop.length);
-
             for (i = 1; i < branch; i++) {  //every level from 1
                 count = count << 1;   //double element!
                 for (j = 0; j < count; j++, index++) {
@@ -429,18 +737,16 @@ class FixNode{
                         ipmasklen = baseMasklen + i; //
                         ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);
 
-                        ip = (baseIP<<branch) + ((index + 2 - count)<<(branch-i));
+                        ip = (baseIP) + ((index + 2 - count)<<(branch-i));
                         ip = ip << (32-(branch+baseMasklen));   //ip address!
 
-                        System.out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
-
-                        //== clear short routing info
-                        int p ,q,r;
-                        p = getNodeStartIndex(index);
-                        q = getNodeEndIndex(index);
-                        for (r=p;r<=q;r++){
-                            nhop[r] = 0; //
+                        if( strFormat!=null ){
+                            out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                        } else{
+                            out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
                         }
+
+                        num++;
                     }
                 }
             }
@@ -448,32 +754,59 @@ class FixNode{
         ipmasklen = branch + baseMasklen;
         ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);;
         for(i=0;i<getBranchSize();i++){
-            if( nhop[i] !=0 ){
-                ip = (baseIP<<branch) + i;
+            if( this.isRib.get(i) ){
+                ip = (baseIP) + i;
                 ip = ip<<(32-(branch+baseMasklen));
 
-                hop = nhop[i];
-                System.out.println(String.format(strFormat,IPv4Util.IP2Str(ip),IPv4Util.IP2Str(ipmask)+"/"+ipmasklen,hop ));
+                hop = this.nhop[i];
+                if( strFormat!=null ){
+                    out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                } else{
+                    out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                }
+                num++;
             }
         }
+
+        return num;
     }
-    public static void show(FixNode root){
-        if( root==null ) return;
-        ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8));
+
+    /**
+     *
+     * @param root
+     */
+    public static void deReferenceAll(FixNode root){
+        if( root==null ) return ;
+        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
+
+        queue.push(root);
+        do{
+            FixNode node = queue.pop();
+            for(int i=0;i<node.getBranchSize();i++){
+                if( node.next[i] !=null ){
+                    queue.push(node.next[i]);
+                    node.next[i] = null;     //dereference!
+                }
+            }
+        }while(!queue.isEmpty());
+    }
+
+    public static int saveToFile(FixNode root,PrintStream ps){
+        if( root==null ) return 0;
+        ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
+
+        int num = 0;
 
         int baseIP=0,baseMasklen=0;
-
-        String strFormat = "%20s %20s %15d";
 
         queue.push(new TrieVisit(root,0,0));
         TrieVisit nodeVisit;
 
-        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
-
         do {
+            num ++;
             nodeVisit = queue.pop();
 
-            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat);
+            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,null,ps);
 
             for(int i=0;i<nodeVisit.node.getBranchSize();i++){
                 if( nodeVisit.node.next[i] != null ){
@@ -486,6 +819,71 @@ class FixNode{
 
         }while(!queue.isEmpty());
 
+        return num;
+    }
+
+    public static int show(FixNode root){
+        return show(root,0,0);
+    }
+    /**
+     *
+     * @param root
+     * @return
+     */
+    public static int show(FixNode root, int ipaddr, int masklen){
+        if( root==null ) return 0;
+
+        int num = 0;
+
+        int baseIP=0,baseMasklen=0;
+
+        String strFormat = "%20s %20s %15d";
+
+        FixNode node = root;
+
+        if( masklen>0 ) {
+            while ( ( node!=null ) && (node.branch < masklen) ){
+                baseMasklen += node.branch; //new baseMasklen
+
+                masklen -= node.branch;
+                int index = node.getIPFragmentOffset(ipaddr,node.branch);
+
+                baseIP = (baseIP<<node.branch) + index; //new baseIP
+
+                ipaddr = (ipaddr<<node.branch); //new ip address
+
+
+                node = node.next[index];
+
+            }
+            //node = queryNode(root, ipaddr, masklen); //and new masklen
+        }
+        if( node==null ) return 0;
+
+        ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
+        queue.push(new TrieVisit(node,baseIP,baseMasklen));
+        TrieVisit nodeVisit;
+
+        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
+
+        do {
+            num ++;
+            nodeVisit = queue.pop();
+
+            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat,System.out);
+
+            for(int i=0;i<nodeVisit.node.getBranchSize();i++){
+                if( nodeVisit.node.next[i] != null ){
+                    baseIP = (nodeVisit.baseIP<<nodeVisit.node.branch) + i;
+                    baseMasklen = nodeVisit.baseMasklen + nodeVisit.node.branch;
+
+                    queue.push(new TrieVisit(nodeVisit.node.next[i],baseIP,baseMasklen));
+                }
+            }
+
+        }while(!queue.isEmpty());
+
+        return num;
     }
 
     //==============================
@@ -522,6 +920,7 @@ class StrideTrieScheme {
      * @return
      */
     public int nextStride(){
+        if( index>= m_steps.length ) return 0;
         return m_steps[index++];
     }
 }

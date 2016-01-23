@@ -17,4 +17,14 @@ public class Util {
 
 		return strCurDir;
 	}
+
+	/**
+	 * split string with any blank char(such as whitespace, tab,...)
+	 * @param str
+	 * @return
+     */
+	public static String[] splitSpace(String str){
+		if( str == null ) return null;
+		return str.trim().split("\\s+");
+	}
 }
