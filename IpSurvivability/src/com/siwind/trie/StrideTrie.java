@@ -451,7 +451,7 @@ public class StrideTrie {
 
     }
     public static void runTrie(){
-        int[] steps={16,8,4,4};
+        int[] steps={8,8,8,8};//{16,8,4,4};
         StrideTrie trie = new StrideTrie(steps);
 
         //StrideTrie trie = new StrideTrie(16,8,4,4);
