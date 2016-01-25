@@ -403,6 +403,8 @@ public class StrideTrie {
 
             strCmd = strLine.split("\\s+")[0];
 
+            if( strCmd.isEmpty() ) continue;
+
             System.out.println("Out[" + (iTotal++) + "]: ");
 
             if( (strCmd.compareTo("quit") == 0) || (strCmd.compareTo("exit")==0) ) break;
@@ -943,14 +945,13 @@ class FixNode{
         if( masklen>0 ) {
             //node = queryNode(root, ipaddr, masklen); //and new masklen
             while ( ( node!=null ) && (masklen > node.branch) ){
-                baseMasklen += node.branch; //new baseMasklen
-
                 masklen -= node.branch;
                 int index = node.getIPFragmentOffset(ipaddr,node.branch);
-
-                baseIP = (baseIP<<node.branch) + index; //new baseIP
-
                 ipaddr = (ipaddr<<node.branch); //new ip address
+
+                //== update baseIP and baseMasklen
+                baseMasklen += node.branch; //new baseMasklen
+                baseIP = (baseIP << node.branch) + index; //new baseIP
 
                 node = node.next[index];
             }
@@ -967,12 +968,14 @@ class FixNode{
 
                     System.out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
                 }
+                //== update baseIP and baseMasklen
+                baseMasklen += node.branch; //new baseMasklen
+                baseIP = (baseIP << node.branch) + index; //new baseIP
+
+                ipaddr = (ipaddr << node.branch); //new ip address
+
+                masklen -= node.branch;
                 node = node.next[index];
-                if( node!= null ) {
-                    baseMasklen += node.branch; //new baseMasklen
-                    baseIP = (baseIP << node.branch) + index; //new baseIP
-                    ipaddr = (ipaddr << node.branch); //new ip address
-                }
             }
 
         }
