@@ -343,12 +343,13 @@ public class StrideTrie {
 
             int total = data.next + data.nhop + data.bitSet + data.lhop;
             float ratio = (float) (((data.entry)*100.0)/total);
+            float ratio1 = (float) (((float)total)/(data.entry));
 
-            String strFormat  = "%10s %16s %16s %10s %15s %16s %20f";
-            String strFormat1 = "%10s %16s %16s %10s %15s %16s %20s";
-            System.out.println(String.format(strFormat1,"Entry","nexthop","next","bitSet","lhop","TOTAL","Entry/Total(%)"));
+            String strFormat  = "%8s %14s %14s %10s %12s %14s %16.4f %16.2f";
+            String strFormat1 = "%8s %14s %14s %10s %12s %14s %16s %16s";
+            System.out.println(String.format(strFormat1,"Entry","nexthop","next","bitSet","lhop","TOTAL","Entry/Total(%)","Total/Entry"));
 
-            System.out.println(String.format(strFormat,data.entry,data.nhop,data.next,data.bitSet,data.lhop,total,ratio));
+            System.out.println(String.format(strFormat,data.entry,data.nhop,data.next,data.bitSet,data.lhop,total,ratio,ratio1));
 
             System.out.print("Scheme = ( ");
             for(int i=0;i<trie.m_steps.length;i++ ) System.out.print(trie.m_steps[i] + " ");
