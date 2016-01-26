@@ -19,40 +19,8 @@ public class StrideTrie {
     protected FixNode m_root;
     protected int m_total=0;       //total rib entry!
 
-    protected void init(){
-        init(null);
-    }
-    protected void init(int[] steps){
-        m_total = 0;
-        if( steps!=null ){
-            m_steps = new int[steps.length];
-            System.arraycopy(steps,0,m_steps,0,steps.length);
-        }
-        m_root = new FixNode(new StrideTrieScheme(m_steps));
-    }
     public StrideTrie(int... args){
         init(args);
-    }
-
-    public boolean addEntry(int ipaddr, int masklen,int nhop){
-        if( masklen<=0 || masklen>32 ) return false;
-        StrideTrieScheme scheme = new StrideTrieScheme(m_steps);
-        scheme.nextStride();
-
-        int oldHop =  m_root.addEntry(ipaddr,masklen,nhop,scheme); //not delete
-        if( oldHop ==0 ){
-            m_total ++ ; //add success!
-        }
-        return true;
-    }
-    public boolean delEntry(int ipaddr, int masklen){
-        if( masklen<=0 || masklen>32 ) return false;
-
-        int oldHop = m_root.delEntry(ipaddr,masklen,0); //not delete
-        if( oldHop!=0 ){
-            m_total --; //del success!
-        }
-        return true;
     }
 
     /**
@@ -147,6 +115,7 @@ public class StrideTrie {
         return true;
 
     }
+
     /**
      *
      * @param trie
@@ -189,11 +158,13 @@ public class StrideTrie {
             }
 
             bOK = true;
-        } catch (Exception e)
-        {
-            e.printStackTrace();
-            System.out.println("Load file error : " + line);
-
+        } catch (Exception ex)        {
+            if( ex instanceof FileNotFoundException){
+                System.out.println("File not found! " + strFile);
+            } else {
+                System.out.println("Load file error : " + line);
+            }
+           // e.printStackTrace();
         }finally {
             try {
                 if( in!=null ) in.close();
@@ -235,6 +206,7 @@ public class StrideTrie {
 
         return bOK;
     }
+
     /**
      * load [file]
      * and file line is:
@@ -246,36 +218,43 @@ public class StrideTrie {
      */
     public static boolean loadCmd(String strCmd, StrideTrie trie){
 
+        String strFile = "";
+
         try{
 
             if( strCmd.isEmpty() ) return false;
             String[] strs = strCmd.split("\\s+");
             if( strs[0].compareTo("load")!=0 ) return false;
 
-            String strFile = strs[1];
-            if( strFile.charAt(0) != '/'){
-                strFile = Util.getCurDir() + strFile;
-            }
-            int maxNum = 0;
-            if( strs.length>=3 ){
-                maxNum = Integer.parseInt(strs[2]);
-            }
-            //System.out.println("Current Directory: " + Util.getCurDir());
+            if( strs.length<2 ){
+                System.out.println(" Load filename is neede!");
+            } else {
+                strFile = strs[1];
+                if (strFile.charAt(0) != '/') {
+                    strFile = Util.getCurDir() + strFile;
+                }
+                int maxNum = 0;
+                if (strs.length >= 3) {
+                    maxNum = Integer.parseInt(strs[2]);
+                }
+                //System.out.println("Current Directory: " + Util.getCurDir());
 
-            loadFromFile(trie,strFile,maxNum);
+                loadFromFile(trie, strFile, maxNum);
 
-            System.out.println("Total entries is : " + trie.m_total);
+                System.out.println("Total entries is : " + trie.m_total);
+            }
 
             //get ip address and netmasklen
 
         }catch (Exception ex){
             System.out.println(strCmd + " failed!");
-            ex.printStackTrace();
+            //ex.printStackTrace();
             return false;
         }
         return true;
 
     }
+
     public static boolean saveCmd(String strCmd, StrideTrie trie){
 
         try{
@@ -284,15 +263,18 @@ public class StrideTrie {
             String[] strs = strCmd.split("\\s+");
             if( strs[0].compareTo("save")!=0 ) return false;
 
-            String strFile = strs[1];
-            if( strFile.charAt(0) != '/'){
-                strFile = Util.getCurDir() + strFile;
+            if( strs.length<2 ){
+                System.out.println(" Save filename is neede!");
+            } else {
+                String strFile = strs[1];
+                if (strFile.charAt(0) != '/') {
+                    strFile = Util.getCurDir() + strFile;
+                }
+
+                saveToFile(trie, strFile);
+
+                System.out.println("Save to File completed! Total entries is " + trie.m_total);
             }
-
-            saveToFile(trie,strFile);
-
-            System.out.println("Save to File completed! Total entries is " + trie.m_total);
-
             //get ip address and netmasklen
 
         }catch (Exception ex){
@@ -303,6 +285,7 @@ public class StrideTrie {
         return true;
 
     }
+
     public static boolean showCmd(String strCmd, StrideTrie trie){
 
         try{
@@ -332,6 +315,7 @@ public class StrideTrie {
         return true;
 
     }
+
     public static boolean infoCmd(String strCmd, StrideTrie trie){
 
         try{
@@ -363,6 +347,7 @@ public class StrideTrie {
         return true;
 
     }
+
     public static String readLine(){
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in ));
 
@@ -376,6 +361,7 @@ public class StrideTrie {
         //System.out.println("ÊäÈëÊý¾Ý£º"+read);
         return strLine;
     }
+
     public static void showMenu(StrideTrie trie){
 
         String strMenu = "Available command are: \n" +
@@ -438,6 +424,7 @@ public class StrideTrie {
         }while(true);
 
     }
+
     /**
      *
      * @param args
@@ -453,6 +440,7 @@ public class StrideTrie {
         FixNode.travelPreOrder(8,0);
 
     }
+
     public static void runTrie(){
         int[] steps={8,8,8,8};//{16,8,4,4};
         StrideTrie trie = new StrideTrie(steps);
@@ -460,6 +448,41 @@ public class StrideTrie {
         //StrideTrie trie = new StrideTrie(16,8,4,4);
 
         showMenu(trie);
+    }
+
+    protected void init(){
+        init(null);
+    }
+
+    protected void init(int[] steps){
+        m_total = 0;
+        if( steps!=null ){
+            m_steps = new int[steps.length];
+            System.arraycopy(steps,0,m_steps,0,steps.length);
+        }
+        m_root = new FixNode(new StrideTrieScheme(m_steps));
+    }
+
+    public boolean addEntry(int ipaddr, int masklen,int nhop){
+        if( masklen<=0 || masklen>32 ) return false;
+        StrideTrieScheme scheme = new StrideTrieScheme(m_steps);
+        scheme.nextStride();
+
+        int oldHop =  m_root.addEntry(ipaddr,masklen,nhop,scheme); //not delete
+        if( oldHop ==0 ){
+            m_total ++ ; //add success!
+        }
+        return true;
+    }
+
+    public boolean delEntry(int ipaddr, int masklen){
+        if( masklen<=0 || masklen>32 ) return false;
+
+        int oldHop = m_root.delEntry(ipaddr,masklen,0); //not delete
+        if( oldHop!=0 ){
+            m_total --; //del success!
+        }
+        return true;
     }
 }
 
@@ -548,6 +571,195 @@ class FixNode{
         }while(true);
     }
 
+    public static int getIPFragment(int ipaddr, int fragmentlen){
+        if( fragmentlen<=0 ) return 0;
+        if( fragmentlen>=32 ) return ipaddr;
+        int striplen = 32 - fragmentlen;
+        return ipaddr & (((1<<fragmentlen)-1)<<(32-fragmentlen));  //caution: must zero-right-shift of >>>
+    }
+
+    public static FixNode queryNode(FixNode root, int ipaddr, int masklen){
+        if( (null == root) || (masklen<=0) ) return root;
+
+        FixNode node = root;
+
+        while ( ( node!=null ) && (node.branch < masklen) ){
+            masklen -= node.branch;
+            int index = node.getIPFragmentOffset(ipaddr,node.branch);
+            ipaddr = (ipaddr<<node.branch); //new ip address
+
+            node = node.next[index];
+
+        }
+
+        return node;
+    }
+
+    /**
+     *
+     * @param root
+     */
+    public static void deReferenceAll(FixNode root){
+        if( root==null ) return ;
+        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
+
+        queue.push(root);
+        do{
+            FixNode node = queue.pop();
+            for(int i=0;i<node.getBranchSize();i++){
+                if( node.next[i] !=null ){
+                    queue.push(node.next[i]);
+                    node.next[i] = null;     //dereference!
+                }
+            }
+        }while(!queue.isEmpty());
+    }
+
+    public static int saveToFile(FixNode root,PrintStream ps){
+        if( root==null ) return 0;
+        ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
+
+        int num = 0;
+
+        int baseIP=0,baseMasklen=0;
+
+        queue.push(new TrieVisit(root,0,0));
+        TrieVisit nodeVisit;
+
+        do {
+            num ++;
+            nodeVisit = queue.pop();
+
+            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,null,ps);
+
+            for(int i=0;i<nodeVisit.node.getBranchSize();i++){
+                if( nodeVisit.node.next[i] != null ){
+                    baseIP = (nodeVisit.baseIP<<nodeVisit.node.branch) + i;
+                    baseMasklen = nodeVisit.baseMasklen + nodeVisit.node.branch;
+
+                    queue.push(new TrieVisit(nodeVisit.node.next[i],baseIP,baseMasklen));
+                }
+            }
+
+        }while(!queue.isEmpty());
+
+        return num;
+    }
+
+    /**
+     *
+     * @param root
+     */
+    public static TrieInfo info(FixNode root){
+        TrieInfo data = new TrieInfo();
+
+        if( root==null ) return data;
+
+        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
+
+        queue.push(root);
+
+        do {
+            FixNode node = queue.pop();  //
+
+            data.add(node.getInfo());
+
+            for(int i=0;i<node.getBranchSize();i++){
+                if( node.next[i]!=null ) queue.push(node.next[i]);
+            }
+
+        }while(!queue.isEmpty());
+
+        return data;
+    }
+
+    public static int show(FixNode root){
+        return show(root,0,0);
+    }
+
+    /**
+     *
+     * @param root
+     * @return
+     */
+    public static int show(FixNode root, int ipaddr, int masklen){
+        if( root==null ) return 0;
+
+        int num = 0;
+
+        int baseIP=0,baseMasklen=0;
+
+        ArrayQueue<TrieVisit> queue = null;
+
+        String strFormat = "%20s %20s %15d";
+
+        FixNode node = root;
+
+        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
+
+        if( (ipaddr==0) && (masklen == 0) ){ //default show all!
+            queue = new ArrayQueue<TrieVisit>(node.getBranchSize(),(1<<8));
+            queue.push(new TrieVisit( root,baseIP,baseMasklen));
+        } else if( masklen>0 ) {
+            //node = queryNode(root, ipaddr, masklen); //and new masklen
+            while ( ( node!=null ) && (masklen > node.branch) ){
+                masklen -= node.branch;
+                int index = node.getIPFragmentOffset(ipaddr,node.branch);
+                ipaddr = (ipaddr<<node.branch); //new ip address
+
+                //== update baseIP and baseMasklen
+                baseMasklen += node.branch; //new baseMasklen
+                baseIP = (baseIP << node.branch) + index; //new baseIP
+
+                node = node.next[index];
+            }
+            if( (node!=null ) ){
+                num += node.printRoute(ipaddr,masklen,baseIP,baseMasklen,strFormat,System.out);
+
+                int index = node.getIPFragmentOffset(ipaddr,node.branch);
+                int count = 1<<(node.branch-masklen);  // d = 0 to branch-1
+                for( int i=0;i<count;i++){
+                    if( node.next[index+i] != null ){
+                        if( queue == null ){ //lazy init!
+                            queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
+                        }
+                        // == push into queue ==
+                        int newBaseMasklen = baseMasklen + node.branch;
+                        int newBaseIP = (baseIP<<node.branch) + index + i;
+
+                        queue.push(new TrieVisit( node.next[index+i],newBaseIP,newBaseMasklen));
+                    }
+                }
+            } //end if node != null
+
+        }
+
+        if( queue ==null ) return 0;
+
+        //ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
+        //queue.push(new TrieVisit(node,baseIP,baseMasklen));
+        //TrieVisit nodeVisit;
+
+        do {
+            num ++;
+            TrieVisit nodeVisit = queue.pop();
+
+            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat,System.out);
+
+            for(int i=0;i<nodeVisit.node.getBranchSize();i++){
+                if( nodeVisit.node.next[i] != null ){
+                    baseIP = (nodeVisit.baseIP<<nodeVisit.node.branch) + i;
+                    baseMasklen = nodeVisit.baseMasklen + nodeVisit.node.branch;
+
+                    queue.push(new TrieVisit(nodeVisit.node.next[i],baseIP,baseMasklen));
+                }
+            }
+
+        }while(!queue.isEmpty());
+
+        return num;
+    }
+
     protected int getBranchSize(){
         return 1<<branch;
     }
@@ -559,13 +771,6 @@ class FixNode{
     protected int getIPFragmentOffset(int ipaddr,int fragmentlen){//the lowest branch-bit
         int ip = getIPFragment(ipaddr,fragmentlen);
         return ip>>>(32-branch);
-    }
-
-    public static int getIPFragment(int ipaddr, int fragmentlen){
-        if( fragmentlen<=0 ) return 0;
-        if( fragmentlen>=32 ) return ipaddr;
-        int striplen = 32 - fragmentlen;
-        return ipaddr & (((1<<fragmentlen)-1)<<(32-fragmentlen));  //caution: must zero-right-shift of >>>
     }
 
     protected int getNodIDfromOffset(int ip,int level){//from nhop offset and level , get nodeID
@@ -644,7 +849,6 @@ class FixNode{
             } while (true);
         }
     }
-
 
     /**
      * Addd entry to routing table!
@@ -754,23 +958,6 @@ class FixNode{
         return oldHop;
     }
 
-    public static FixNode queryNode(FixNode root, int ipaddr, int masklen){
-        if( (null == root) || (masklen<=0) ) return root;
-
-        FixNode node = root;
-
-        while ( ( node!=null ) && (node.branch < masklen) ){
-            masklen -= node.branch;
-            int index = node.getIPFragmentOffset(ipaddr,node.branch);
-            ipaddr = (ipaddr<<node.branch); //new ip address
-
-            node = node.next[index];
-
-        }
-
-        return node;
-    }
-
     protected TrieInfo getInfo(){
         TrieInfo val = new TrieInfo();
 
@@ -875,175 +1062,12 @@ class FixNode{
 
         return num;
     }
+
     protected int printRoute(int baseIP,int baseMasklen,String strFormat, PrintStream out){
         int num = 0;
 
         num += printRoute(0,1,baseIP,baseMasklen,strFormat,out);
         num += printRoute(1<<31,1,baseIP,baseMasklen,strFormat,out);
-
-        return num;
-    }
-
-    /**
-     *
-     * @param root
-     */
-    public static void deReferenceAll(FixNode root){
-        if( root==null ) return ;
-        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
-
-        queue.push(root);
-        do{
-            FixNode node = queue.pop();
-            for(int i=0;i<node.getBranchSize();i++){
-                if( node.next[i] !=null ){
-                    queue.push(node.next[i]);
-                    node.next[i] = null;     //dereference!
-                }
-            }
-        }while(!queue.isEmpty());
-    }
-
-    public static int saveToFile(FixNode root,PrintStream ps){
-        if( root==null ) return 0;
-        ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
-
-        int num = 0;
-
-        int baseIP=0,baseMasklen=0;
-
-        queue.push(new TrieVisit(root,0,0));
-        TrieVisit nodeVisit;
-
-        do {
-            num ++;
-            nodeVisit = queue.pop();
-
-            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,null,ps);
-
-            for(int i=0;i<nodeVisit.node.getBranchSize();i++){
-                if( nodeVisit.node.next[i] != null ){
-                    baseIP = (nodeVisit.baseIP<<nodeVisit.node.branch) + i;
-                    baseMasklen = nodeVisit.baseMasklen + nodeVisit.node.branch;
-
-                    queue.push(new TrieVisit(nodeVisit.node.next[i],baseIP,baseMasklen));
-                }
-            }
-
-        }while(!queue.isEmpty());
-
-        return num;
-    }
-
-    /**
-     *
-     * @param root
-     */
-    public static TrieInfo info(FixNode root){
-        TrieInfo data = new TrieInfo();
-
-        if( root==null ) return data;
-
-        ArrayQueue<FixNode> queue = new ArrayQueue<FixNode>(5*(1<<8),(1<<8));
-
-        queue.push(root);
-
-        do {
-            FixNode node = queue.pop();  //
-
-            data.add(node.getInfo());
-
-            for(int i=0;i<node.getBranchSize();i++){
-                if( node.next[i]!=null ) queue.push(node.next[i]);
-            }
-
-        }while(!queue.isEmpty());
-
-        return data;
-    }
-
-    public static int show(FixNode root){
-        return show(root,0,0);
-    }
-    /**
-     *
-     * @param root
-     * @return
-     */
-    public static int show(FixNode root, int ipaddr, int masklen){
-        if( root==null ) return 0;
-
-        int num = 0;
-
-        int baseIP=0,baseMasklen=0;
-
-        ArrayQueue<TrieVisit> queue = null;
-
-        String strFormat = "%20s %20s %15d";
-
-        FixNode node = root;
-
-        System.out.println(String.format("%20s %20s %15s","IPAddress","Netmask","Nexthop"));
-
-        if( (ipaddr==0) && (masklen == 0) ){ //default show all!
-            queue = new ArrayQueue<TrieVisit>(node.getBranchSize(),(1<<8));
-            queue.push(new TrieVisit( root,baseIP,baseMasklen));
-        } else if( masklen>0 ) {
-            //node = queryNode(root, ipaddr, masklen); //and new masklen
-            while ( ( node!=null ) && (masklen > node.branch) ){
-                masklen -= node.branch;
-                int index = node.getIPFragmentOffset(ipaddr,node.branch);
-                ipaddr = (ipaddr<<node.branch); //new ip address
-
-                //== update baseIP and baseMasklen
-                baseMasklen += node.branch; //new baseMasklen
-                baseIP = (baseIP << node.branch) + index; //new baseIP
-
-                node = node.next[index];
-            }
-            if( (node!=null ) ){
-                num += node.printRoute(ipaddr,masklen,baseIP,baseMasklen,strFormat,System.out);
-
-                int index = node.getIPFragmentOffset(ipaddr,node.branch);
-                int count = 1<<(node.branch-masklen);  // d = 0 to branch-1
-                for( int i=0;i<count;i++){
-                    if( node.next[index+i] != null ){
-                        if( queue == null ){ //lazy init!
-                            queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
-                        }
-                        // == push into queue ==
-                        int newBaseMasklen = baseMasklen + node.branch;
-                        int newBaseIP = (baseIP<<node.branch) + index + i;
-
-                        queue.push(new TrieVisit( node.next[index+i],newBaseIP,newBaseMasklen));
-                    }
-                }
-            } //end if node != null
-
-        }
-
-        if( queue ==null ) return 0;
-
-        //ArrayQueue<TrieVisit> queue = new ArrayQueue<TrieVisit>(5*(1<<8),(1<<8));
-        //queue.push(new TrieVisit(node,baseIP,baseMasklen));
-        //TrieVisit nodeVisit;
-
-        do {
-            num ++;
-            TrieVisit nodeVisit = queue.pop();
-
-            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat,System.out);
-
-            for(int i=0;i<nodeVisit.node.getBranchSize();i++){
-                if( nodeVisit.node.next[i] != null ){
-                    baseIP = (nodeVisit.baseIP<<nodeVisit.node.branch) + i;
-                    baseMasklen = nodeVisit.baseMasklen + nodeVisit.node.branch;
-
-                    queue.push(new TrieVisit(nodeVisit.node.next[i],baseIP,baseMasklen));
-                }
-            }
-
-        }while(!queue.isEmpty());
 
         return num;
     }
