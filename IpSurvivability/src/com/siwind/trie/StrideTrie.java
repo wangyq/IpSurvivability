@@ -279,7 +279,7 @@ public class StrideTrie {
 
         }catch (Exception ex){
             System.out.println(strCmd + " failed!");
-            ex.printStackTrace();
+            //ex.printStackTrace();
             return false;
         }
         return true;
