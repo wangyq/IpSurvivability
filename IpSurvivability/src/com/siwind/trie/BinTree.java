@@ -1,3 +1,7 @@
+/**
+ * 用于测试遍历树时, 非递归算法的效率
+ *
+ */
 package com.siwind.trie;
 
 import com.siwind.tools.Stack;

@@ -8,6 +8,7 @@ import com.siwind.tools.Util;
 
 import java.io.*;
 import java.security.InvalidParameterException;
+import java.util.ArrayList;
 import java.util.BitSet;
 
 /**
@@ -15,13 +16,22 @@ import java.util.BitSet;
  */
 public class StrideTrie {
 
+    static final int DEFAULT_ROUTERS = 3;
+    static final int DEFAULT_MAXNUM = 1024*1024;
+
     protected int[] m_steps;
     protected FixNode m_root;
     protected int m_total=0;       //total rib entry!
 
+    protected int m_numOfRouters = DEFAULT_ROUTERS;
+
+    protected MultiNextHopDb m_mnhdb = null;
+
     public StrideTrie(int... args){
         init(args);
+
     }
+
 
     /**
      * add [ipaddr/masklen] via [nexthop]
@@ -41,7 +51,8 @@ public class StrideTrie {
             int nhop = 0;
             nhop = Integer.parseInt(strs[3]);
 
-            trie.addEntry(ips[0],ips[1],nhop);
+            //trie.addEntry(ips[0],ips[1],nhop);
+            trie.addRandomItem(ips[0],ips[1]);
 
             System.out.println("Total entries is : " + trie.m_total);
 
@@ -114,6 +125,31 @@ public class StrideTrie {
         }
         return true;
 
+    }
+    public int[] loadFromFile(String strFile, int maxline, int numOfRouters){
+        if( numOfRouters>0 ) {
+            m_numOfRouters = numOfRouters;
+        }
+        return loadFromFile(strFile,maxline);
+    }
+    public int[] loadFromFile(String strFile, int maxline){
+        int[] nhdb = new int[2];
+
+        int first = this.m_mnhdb.getNumberOfNextHop();
+        this.m_mnhdb.loadFromFile(strFile,maxline,m_numOfRouters);
+        int last = this.m_mnhdb.getNumberOfNextHop();
+
+        nhdb[0] = first;
+        nhdb[1] = last;
+
+        return nhdb;
+    }
+
+    public boolean addRandomItem(int ip, int masklen){
+        int nhdb = this.m_mnhdb.addRandomNextItem(ip,masklen,m_numOfRouters);
+        this.addEntry(ip,masklen,nhdb);
+
+        return true;
     }
 
     /**
@@ -207,6 +243,63 @@ public class StrideTrie {
         return bOK;
     }
 
+    public static boolean loadCmd(String strCmd, StrideTrie trie){
+        String strFile = "";
+
+        try{
+
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("load")!=0 ) return false;
+
+            if( strs.length<2 ){
+                System.out.println(" Load filename is neede!");
+            } else {
+                strFile = strs[1];
+                if (strFile.charAt(0) != '/') {
+                    strFile = Util.getCurDir() + strFile;
+                }
+                //System.out.println("Current Directory: " + Util.getCurDir());
+                int maxNum = 0;
+                if (strs.length >= 3) {
+                    maxNum = Integer.parseInt(strs[2]);
+                }
+                int numOfRouters = 0;
+                if (strs.length >= 4) {
+                    numOfRouters = Integer.parseInt(strs[3]);
+                }
+
+                trie.init();//
+
+                int[] nhdb = trie.loadFromFile(strFile,maxNum,numOfRouters);
+
+                //trie.m_mnhdb.loadFromFile(strFile,maxNum,numOfRouters);
+
+                long t1 = System.nanoTime();
+                long t11 = System.currentTimeMillis();
+                //loadFromFile(trie, strFile, maxNum);
+                for(int i=nhdb[0];i<nhdb[1];i++){
+                    trie.addEntry(trie.m_mnhdb.getRouteItem(i).ipAddr,trie.m_mnhdb.getRouteItem(i).maskLen,i);
+                }
+                long t2 = System.nanoTime();
+                long t22 = System.currentTimeMillis();
+
+                long between = t2 - t1;
+                long microsecond = between/1000;
+                long milis = (t22-t11);
+                System.out.println("Total time is : " + microsecond + " us (microsecond). " + milis + " milisecond. insert time = " + microsecond/trie.m_total + " us (microsecond).");
+                System.out.println("Total entries is : " + trie.m_total);
+            }
+
+            //get ip address and netmasklen
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+    }
     /**
      * load [file]
      * and file line is:
@@ -216,7 +309,7 @@ public class StrideTrie {
      * @param trie
      * @return
      */
-    public static boolean loadCmd(String strCmd, StrideTrie trie){
+    public static boolean loadCmd_old(String strCmd, StrideTrie trie){
 
         String strFile = "";
 
@@ -239,8 +332,16 @@ public class StrideTrie {
                 }
                 //System.out.println("Current Directory: " + Util.getCurDir());
 
+                long t1 = System.nanoTime();
+                long t11 = System.currentTimeMillis();
                 loadFromFile(trie, strFile, maxNum);
+                long t2 = System.nanoTime();
+                long t22 = System.currentTimeMillis();
 
+                long between = t2 - t1;
+                long ms = between/1000;
+                long milis = (t22-t11);
+                System.out.println("Total time is : " + ms + " milisecond. " + milis + " milisecond. insert time =" + milis/trie.m_total + " milisecond.");
                 System.out.println("Total entries is : " + trie.m_total);
             }
 
@@ -287,6 +388,39 @@ public class StrideTrie {
     }
 
     public static boolean showCmd(String strCmd, StrideTrie trie){
+
+        try{
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("show")!=0 ) return false;
+
+            int[] ips = {0,0};
+            if( strs.length>=2 ) {
+                //get ip address and netmasklen
+                if (!IPv4Util.IPandMasklenfromStr(strs[1], ips)) {
+                    throw new InvalidParameterException("Command parameter wrong!");
+                    //return false;
+                }
+            }
+
+            ArrayList<Integer> nhdb = FixNode.showEntry(trie.m_root,ips[0],ips[1]); //show
+
+            trie.m_mnhdb.printNextHop(nhdb);
+
+            System.out.println("Number nodes to show : " + nhdb.size());
+
+            System.out.println("Total entries is : " + trie.m_total);
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+
+    }
+
+    public static boolean showCmd_old(String strCmd, StrideTrie trie){
 
         try{
             if( strCmd.isEmpty() ) return false;
@@ -368,7 +502,7 @@ public class StrideTrie {
                 "add [ipaddr/masklen] via [nexthop] \n" +
                 "del [ipaddr/masklen] \n" +
                 "clear [step step step step ...]  \n" +
-                "load [file] [maxLine]\n" +
+                "load [file] [maxLine=0] [numberRouters]\n" +
                 "save [file] \n" +
                 "show [ipaddr/masklen] \n" +
                 "info \n" +
@@ -442,7 +576,7 @@ public class StrideTrie {
     }
 
     public static void runTrie(){
-        int[] steps={8,8,8,8};//{16,8,4,4};
+        int[] steps= {8,4,4,2,2,2,2,4,4};//{8,8,8,8};//{16,8,4,4};
         StrideTrie trie = new StrideTrie(steps);
 
         //StrideTrie trie = new StrideTrie(16,8,4,4);
@@ -461,6 +595,12 @@ public class StrideTrie {
             System.arraycopy(steps,0,m_steps,0,steps.length);
         }
         m_root = new FixNode(new StrideTrieScheme(m_steps));
+
+        if( m_mnhdb != null ){
+            m_mnhdb.clear();  //GC now!
+        }else {
+            m_mnhdb = new MultiNextHopDb(DEFAULT_MAXNUM);
+        }
     }
 
     public boolean addEntry(int ipaddr, int masklen,int nhop){
@@ -488,6 +628,8 @@ public class StrideTrie {
 
 
 class FixNode{
+
+    public static final int NULL_NHDB = 0;
 
     protected int branch = 0;
     protected int skip = 0;
@@ -671,6 +813,94 @@ class FixNode{
         }while(!queue.isEmpty());
 
         return data;
+    }
+
+    /**
+     *
+     * @param nhdb
+     * @param node
+     * @return
+     */
+    public static boolean showEntry(ArrayList<Integer> nhdb, FixNode node){
+
+        if( node.lhop != null) {//could find route here!
+            for (int i = 0; i < node.lhop.length; i++) {
+                if (node.lhop[i] > NULL_NHDB) {
+                    nhdb.add(node.lhop[i]);
+                }
+            }
+        }
+
+        for(int i=0;i<node.isRib.length();i++){//
+            if( node.isRib.get(i)){
+                nhdb.add(node.nhop[i]);
+            }
+
+        }
+        for(int i=0;i<node.next.length;i++){//find in the next level
+            if( node.next[i] != null ){
+                showEntry(nhdb, node.next[i]);
+            }
+
+        }
+        return true;
+    }
+
+    /**
+     *
+     * @param root
+     * @param ipaddr
+     * @param masklen
+     * @return
+     */
+    public static ArrayList<Integer> showEntry( FixNode root, int ipaddr, int masklen){
+        ArrayList<Integer> nhdb = new ArrayList<Integer>();
+
+        if( (ipaddr == 0) || (masklen ==0 ) ){//from root show all node.
+            showEntry(nhdb,root);
+        } else {//not default route
+
+            FixNode node = root;
+
+            while ((node != null) && (node.branch < masklen)) {
+                masklen -= node.branch;
+                int index = node.getIPFragmentOffset(ipaddr, node.branch);
+                ipaddr = (ipaddr << node.branch); //new ip address
+
+                node = node.next[index];
+
+            }
+            if (node != null) { //find route, masklen <= node.branch
+                int d = node.branch - masklen;
+                int span = 1;  //
+                int ip_offset = node.getIPFragmentOffset(ipaddr, masklen);
+                int nodeID = node.getNodIDfromOffset(ip_offset, masklen);
+
+                if (node.lhop != null) {//
+                    for (int i = 0; i < d; i++) { //from level of masklen to branch-1
+                        for (int j = 0; j < span; j++) {
+                            int index = nodeID + j;
+                            if (node.lhop[nodeID + j] != 0) {//find rib item!
+                                //int hop = this.lhop[index];
+                                nhdb.add(node.lhop[index]);
+                            }
+                        }//end of j
+                        nodeID = nodeID * 2 + 2;
+                        span *= 2;
+                    }
+                }
+                //==========================================================
+                int index = node.getIPFragmentOffset(ipaddr, node.branch);
+                int count = 1 << (node.branch - masklen);  // d = 0 to branch-1
+
+                for (int i = 0; i < count; i++) {
+                    if (node.next[index + i] != null) {
+                        showEntry(nhdb, node.next[index + i]);  //next level!
+                    }
+                }
+            }
+        }
+        return nhdb;
     }
 
     public static int show(FixNode root){

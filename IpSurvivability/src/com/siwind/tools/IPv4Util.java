@@ -190,4 +190,10 @@ public final class IPv4Util {
         IPfromStr(strIP,ips);
         return ips[0];
     }
+
+    public static boolean checkMatchIPwithMaskLen(int ip, int masklen){
+
+        int maskip = NetmaskFromMasklen(masklen);
+        return ip == (ip&maskip);
+    }
 }
