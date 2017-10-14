@@ -37,7 +37,7 @@ public class MultiNextHopDb {
 
     public void clear(){
         this.nhdb.clear();
-        this.nhdb.add( new NextHopItem(0,0,1));
+        this.nhdb.add( new NextHopItem(0,0,1)); //default route!
     }
     public NextHopItem getRouteItem(int index){
         return nhdb.get(index);
@@ -45,6 +45,14 @@ public class MultiNextHopDb {
 
     public void setNextHopItem(int index, NextHopItem item){
         nhdb.set(index,item);
+    }
+
+    public int addNextItem(int ip, int masklen, int srcid, int destid, int numRouters){
+        NextHopItem item = new NextHopItem(ip,masklen,numRouters);
+        item.setNhdbWithRouterID(srcid,destid);
+
+        this.nhdb.add(item);
+        return this.nhdb.size()-1;
     }
 
     public int addRandomNextItem(int ip, int masklen, int numRouters){
@@ -188,7 +196,7 @@ class NextHopItem{
     int ipAddr = 0;
     byte maskLen = 0;
 
-    int nhdb[] = null;
+    int nhdb[] = null; // array of number routers!
 
     public NextHopItem(int ipAddr, int maskLen, int numOfRouter){
         if( numOfRouter<=0 ){
@@ -200,8 +208,6 @@ class NextHopItem{
 
         this.ipAddr = ipAddr;
         this.maskLen = (byte) (maskLen&0xff);
-
-
 
         nhdb = new int[numOfRouter];
         for(int i=0;i<numOfRouter;i++){
@@ -265,7 +271,9 @@ class NextHopItem{
         StringBuilder str = new StringBuilder();
 
         for(int i=0;i<nh.length;i++){
-            str.append("<").append(i).append(",").append(nh[i]).append("> ");
+            if(nh[i] != NextHopItem.NULL_NHDB) {
+                str.append("<").append(i).append(",").append(nh[i]).append("> ");
+            }
         }
         return str.toString();
 

@@ -7,9 +7,11 @@ import com.siwind.tools.Stack;
 import com.siwind.tools.Util;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Random;
 
 /**
  * Created by wang on 16-1-8.
@@ -23,7 +25,7 @@ public class StrideTrie {
     protected FixNode m_root;
     protected int m_total=0;       //total rib entry!
 
-    protected int m_numOfRouters = DEFAULT_ROUTERS;
+    private int m_numOfRouters = DEFAULT_ROUTERS;
 
     protected MultiNextHopDb m_mnhdb = null;
 
@@ -128,7 +130,7 @@ public class StrideTrie {
     }
     public int[] loadFromFile(String strFile, int maxline, int numOfRouters){
         if( numOfRouters>0 ) {
-            m_numOfRouters = numOfRouters;
+            setNumOfRouters(numOfRouters);
         }
         return loadFromFile(strFile,maxline);
     }
@@ -136,7 +138,7 @@ public class StrideTrie {
         int[] nhdb = new int[2];
 
         int first = this.m_mnhdb.getNumberOfNextHop();
-        this.m_mnhdb.loadFromFile(strFile,maxline,m_numOfRouters);
+        this.m_mnhdb.loadFromFile(strFile,maxline, getNumOfRouters());
         int last = this.m_mnhdb.getNumberOfNextHop();
 
         nhdb[0] = first;
@@ -146,7 +148,7 @@ public class StrideTrie {
     }
 
     public boolean addRandomItem(int ip, int masklen){
-        int nhdb = this.m_mnhdb.addRandomNextItem(ip,masklen,m_numOfRouters);
+        int nhdb = this.m_mnhdb.addRandomNextItem(ip,masklen, getNumOfRouters());
         this.addEntry(ip,masklen,nhdb);
 
         return true;
@@ -253,7 +255,7 @@ public class StrideTrie {
             if( strs[0].compareTo("load")!=0 ) return false;
 
             if( strs.length<2 ){
-                System.out.println(" Load filename is neede!");
+                System.out.println(" Load filename is needed!");
             } else {
                 strFile = strs[1];
                 if (strFile.charAt(0) != '/') {
@@ -320,7 +322,7 @@ public class StrideTrie {
             if( strs[0].compareTo("load")!=0 ) return false;
 
             if( strs.length<2 ){
-                System.out.println(" Load filename is neede!");
+                System.out.println(" Load filename is needed!");
             } else {
                 strFile = strs[1];
                 if (strFile.charAt(0) != '/') {
@@ -354,6 +356,72 @@ public class StrideTrie {
         }
         return true;
 
+    }
+
+    /**
+     * add route entry from file.
+     * file format :
+     *  IpAddr/masklen [nexthop]
+     *  or:
+     *  IpAddr masklen [nexthop]
+     *
+     * @param strCmd
+     * @param trie
+     * @return
+     */
+    public static boolean addfileCmd(String strCmd, StrideTrie trie){
+        String strFile = "";
+
+        try{
+
+            if( strCmd.isEmpty() ) return false;
+            String[] strs = strCmd.split("\\s+");
+            if( strs[0].compareTo("addfile")!=0 ) return false;
+
+            if( strs.length<2 ){
+                System.out.println(" addfile filename is needed!");
+            } else {
+                strFile = strs[1];
+                if (strFile.charAt(0) != '/') {
+                    strFile = Util.getCurDir() + strFile;
+                }
+                //System.out.println("Current Directory: " + Util.getCurDir());
+                int maxNum = 0;
+                if (strs.length >= 3) {
+                    maxNum = Integer.parseInt(strs[2]);
+                }
+                int numOfRouters = trie.getNumOfRouters(); //default numOf Routers
+                if (strs.length >= 4) {
+                    numOfRouters = Integer.parseInt(strs[3]);
+                    if (numOfRouters > trie.getNumOfRouters()) {
+                        trie.setNumOfRouters(numOfRouters); //reset numberOfRouters
+                    }
+                }
+                ArrayList<int[] > items = MenuUtil.loadEntryFromFile(strFile,maxNum,numOfRouters);
+
+                long t1 = System.nanoTime();
+                long t11 = System.currentTimeMillis();
+                for(int i=0;i<items.size();i++){
+                    trie.addEntry(items.get(i)[0],items.get(i)[1],items.get(i)[2],items.get(i)[3]);
+                }
+                long t2 = System.nanoTime();
+                long t22 = System.currentTimeMillis();
+
+                long between = t2 - t1;
+                long microsecond = between/1000;
+                long milis = (t22-t11);
+                System.out.println("Total time is : " + microsecond + " us (microsecond). " + milis + " milisecond. insert time = " + microsecond/trie.m_total + " us (microsecond).");
+                System.out.println("Total entries is : " + trie.m_total);
+            }
+
+            //get ip address and netmasklen
+
+        }catch (Exception ex){
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
     }
 
     public static boolean saveCmd(String strCmd, StrideTrie trie){
@@ -503,6 +571,7 @@ public class StrideTrie {
                 "del [ipaddr/masklen] \n" +
                 "clear [step step step step ...]  \n" +
                 "load [file] [maxLine=0] [numberRouters]\n" +
+                "addfile [file] [maxLine=0] [numberRouters]\n" +
                 "save [file] \n" +
                 "show [ipaddr/masklen] \n" +
                 "info \n" +
@@ -541,7 +610,10 @@ public class StrideTrie {
             }else if(strCmd.compareTo("load") == 0 ){
                 loadCmd(strLine,trie);
 
-            }else if(strCmd.compareTo("save") == 0 ){
+            }else if(strCmd.compareTo("addfile") == 0 ){
+            addfileCmd(strLine,trie);
+
+        }    else if(strCmd.compareTo("save") == 0 ){
                 saveCmd(strLine,trie);
 
             }else if(strCmd.compareTo("show") == 0 ){
@@ -603,7 +675,20 @@ public class StrideTrie {
         }
     }
 
-    public boolean addEntry(int ipaddr, int masklen,int nhop){
+    /**
+     *
+     * @param ipaddr
+     * @param masklen
+     * @param srcid
+     * @param destid
+     * @return
+     */
+    public boolean addEntry(int ipaddr, int masklen,int srcid, int destid){
+        int nhdb = this.m_mnhdb.addNextItem(ipaddr,masklen,srcid,destid,m_numOfRouters);
+        return addEntry(ipaddr,masklen,nhdb);
+    }
+
+    protected boolean addEntry(int ipaddr, int masklen,int nhop){
         if( masklen<=0 || masklen>32 ) return false;
         StrideTrieScheme scheme = new StrideTrieScheme(m_steps);
         scheme.nextStride();
@@ -624,8 +709,94 @@ public class StrideTrie {
         }
         return true;
     }
+
+    public int getNumOfRouters() {
+        return m_numOfRouters;
+    }
+
+    public void setNumOfRouters(int m_numOfRouters) {
+        this.m_numOfRouters = m_numOfRouters;
+    }
 }
 
+class MenuUtil{
+
+    /**
+     * File format :
+     * IpAddr/masklen [src_rid  dest_rid]
+     * or:
+     * IpAddr masklen [src_rid  dest_rid]
+     *
+     * @param strFile
+     * @param maxline
+     * @param numOfRouters
+     * @return int[]
+     *      where : int[0]=IpAddr, int[1]=masklen,int[2]=SrcRid,int[3]=DestRid,
+     */
+    public static ArrayList<int[]> loadEntryFromFile(String strFile, int maxline, int numOfRouters){
+        BufferedReader in = null;
+        String line="";
+
+        int total = 0;
+        ArrayList<int[]> items = new ArrayList<>();
+        Random rand = new Random(); //
+
+        try
+        {
+            in=new BufferedReader(new FileReader(strFile));
+
+            while ((line=in.readLine() )!=null) {
+                //System.out.println(line);
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                //split with whitespace or "/"
+                String[] strs = line.trim().split("\\s+|\\/");
+                if (strs.length < 2) continue; //wrong format!
+
+                if (!IPv4Util.isIPv4Valid(strs[0])) continue;
+                int ip = IPv4Util.IPfromStr(strs[0]);
+                int masklen = Integer.parseInt(strs[1]);
+                int[] item = new int[4];
+                item[0] = ip;
+                item[1] = masklen;
+                if( strs.length >=4 ){
+                    item[2] = Integer.parseInt(strs[2]);
+                    item[3] = Integer.parseInt(strs[3]);
+                }else {
+                    item[2] = rand.nextInt(numOfRouters);
+                    item[3] = rand.nextInt(numOfRouters);
+                    //make sure not the same!
+                    if( item[3] == item[2] ){
+                        item[3] = numOfRouters -1 - item[3];
+                    }
+                }
+
+                items.add(item);//add item
+
+                total ++;
+                if( maxline>0 ){
+                    if( total>= maxline ) break;  //already read enough item.
+                }
+            }
+
+        } catch (Exception ex)        {
+            if( ex instanceof FileNotFoundException){
+                System.out.println("File not found! " + strFile);
+            } else {
+                System.out.println("Load file error : " + line);
+            }
+            // e.printStackTrace();
+        }finally {
+            try {
+                if( in!=null ) in.close();
+            }catch (IOException ex){
+
+            }
+        }
+        return items;
+    }
+}
 
 class FixNode{
 
