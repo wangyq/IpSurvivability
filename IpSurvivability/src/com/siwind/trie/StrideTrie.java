@@ -1115,7 +1115,7 @@ class FixNode{
                 node = node.next[index];
             }
             if( (node!=null ) ){
-                num += node.printRoute(ipaddr,masklen,baseIP,baseMasklen,strFormat,System.out);
+                num += node.printEPRoute(ipaddr,masklen,baseIP,baseMasklen,strFormat,System.out);
 
                 int index = node.getIPFragmentOffset(ipaddr,node.branch);
                 int count = 1<<(node.branch-masklen);  // d = 0 to branch-1
@@ -1145,7 +1145,7 @@ class FixNode{
             num ++;
             TrieVisit nodeVisit = queue.pop();
 
-            nodeVisit.node.printRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat,System.out);
+            nodeVisit.node.printEPRoute(nodeVisit.baseIP,nodeVisit.baseMasklen,strFormat,System.out);
 
             for(int i=0;i<nodeVisit.node.getBranchSize();i++){
                 if( nodeVisit.node.next[i] != null ){
@@ -1379,7 +1379,17 @@ class FixNode{
         return val;
     }
 
-    protected int printRoute(int ipaddr,int masklen,int baseIP,int baseMasklen,String strFormat, PrintStream out){
+    /**
+     * print route with Expansion route
+     * @param ipaddr
+     * @param masklen
+     * @param baseIP
+     * @param baseMasklen
+     * @param strFormat
+     * @param out
+     * @return
+     */
+    protected int printEPRoute(int ipaddr,int masklen,int baseIP,int baseMasklen,String strFormat, PrintStream out){
         int num = 0;
 
         if( masklen<=0 ){
@@ -1464,6 +1474,109 @@ class FixNode{
         return num;
     }
 
+    protected int printEPRoute(int baseIP,int baseMasklen,String strFormat, PrintStream out){
+        int num = 0;
+
+        num += printEPRoute(0,1,baseIP,baseMasklen,strFormat,out);
+        num += printEPRoute(1<<31,1,baseIP,baseMasklen,strFormat,out);
+
+        return num;
+    }
+
+    /**
+     * print only route, without Expansion route
+     * @param ipaddr
+     * @param masklen
+     * @param baseIP
+     * @param baseMasklen
+     * @param strFormat
+     * @param out
+     * @return
+     */
+    protected int printRoute(int ipaddr,int masklen,int baseIP,int baseMasklen,String strFormat, PrintStream out){
+        int num = 0;
+
+        if( masklen<=0 ){
+            ; //nothing to do!
+        }else if( masklen < this.branch ) {
+            int d = this.branch - masklen;
+            int span = 1;  //
+            int ip_offset = getIPFragmentOffset(ipaddr,masklen);
+            int nodeID = getNodIDfromOffset(ip_offset,masklen);
+
+            if( this.lhop!=null ) {//
+                for (int i = 0; i < d; i++) { //from level of masklen to branch-1
+                    for (int j = 0; j < span; j++) {
+                        int index = nodeID + j;
+                        if (this.lhop[nodeID + j] != 0) {//find rib item!
+                            int hop = this.lhop[index];
+                            int ipmasklen = baseMasklen + masklen + i;
+                            int ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);
+
+                            int ip = (baseIP<<(masklen + i)) + (ip_offset>>>(this.branch -masklen - i)) + j;
+                            ip = ip<<(32-ipmasklen);
+
+                            if( strFormat!=null ){
+                                out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                            } else{
+                                out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                            }
+                            // == num ==
+                            num ++;
+                        }
+                    }//end of j
+                    nodeID = nodeID*2 + 2;
+                    span *= 2;
+                }
+            }
+
+            //== next node==
+            for(int i=0;i<(1<<(this.branch-masklen));i++){
+                int index = ip_offset + i;
+                if( this.nhop[index] != 0 && this.isRib.get(index) ){
+                    int hop = this.nhop[index];
+                    int ipmasklen = baseMasklen + this.branch;
+                    int ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);
+
+                    int ip = (baseIP<<(this.branch)) + ip_offset + i;
+                    ip = ip<<(32-ipmasklen);
+
+                    if( strFormat!=null ){
+                        out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                    } else{
+                        out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                    }
+                    // = num ==
+                    num ++;
+                }
+            }
+        }
+        else if( masklen== this.branch ){
+            int ip_offset = getIPFragmentOffset(ipaddr,this.branch);
+            if( this.nhop[ip_offset] != 0 ) {
+                int hop = this.nhop[ip_offset];
+                int ipmasklen = baseMasklen + this.branch;
+                int ipmask = IPv4Util.NetmaskFromMasklen(ipmasklen);
+
+                int ip = (baseIP<<this.branch) + ip_offset;
+                ip = ip<<(32-ipmasklen);
+
+                if( strFormat!=null ){
+                    out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
+                } else{
+                    out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                }
+
+                num ++;
+            }
+
+        } else{ //masklen > this.branch
+            ;//
+        }
+
+        return num;
+    }
+
     protected int printRoute(int baseIP,int baseMasklen,String strFormat, PrintStream out){
         int num = 0;
 
@@ -1472,7 +1585,6 @@ class FixNode{
 
         return num;
     }
-
     //==============================
 
 }
