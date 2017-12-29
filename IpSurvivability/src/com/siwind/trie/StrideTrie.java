@@ -155,7 +155,7 @@ public class StrideTrie {
     }
 
     /**
-     *
+     * white space char or / as separator
      * @param trie
      * @param strFile
      * @param maxNum: number record to read in. 0 means read total file.
@@ -177,13 +177,13 @@ public class StrideTrie {
                 line=line.trim();
                 if( line.isEmpty() ) continue;
 
-                String[] strs = line.trim().split("\\s+");
-                if( strs.length<3) continue; //wrong format!
+                String[] strs = line.trim().split("\\s+|/");
+                if( strs.length<2) continue; //wrong format!
 
                 if( !IPv4Util.isIPv4Valid(strs[0])) continue;
                 int ip = IPv4Util.IPfromStr(strs[0]);
                 int masklen = Integer.parseInt(strs[1]);
-                int nhop = Integer.parseInt(strs[2]);
+                int nhop = (strs.length>2)?Integer.parseInt(strs[2]):0;
 
                 trie.addEntry(ip,masklen,nhop);
 
@@ -751,7 +751,7 @@ class MenuUtil{
                 if (line.isEmpty()) continue;
 
                 //split with whitespace or "/"
-                String[] strs = line.trim().split("\\s+|\\/");
+                String[] strs = line.trim().split("\\s+|/|\\\\"); //separator of /,\ or white
                 if (strs.length < 2) continue; //wrong format!
 
                 if (!IPv4Util.isIPv4Valid(strs[0])) continue;
@@ -1519,7 +1519,7 @@ class FixNode{
                             if( strFormat!=null ){
                                 out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
                             } else{
-                                out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                                out.println(IPv4Util.IP2Str(ip) + "/" + ipmasklen + " " + hop);
                             }
                             // == num ==
                             num ++;
@@ -1544,7 +1544,7 @@ class FixNode{
                     if( strFormat!=null ){
                         out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
                     } else{
-                        out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                        out.println(IPv4Util.IP2Str(ip) + "/" + ipmasklen + " " + hop);
                     }
                     // = num ==
                     num ++;
@@ -1564,7 +1564,7 @@ class FixNode{
                 if( strFormat!=null ){
                     out.println(String.format(strFormat, IPv4Util.IP2Str(ip), IPv4Util.IP2Str(ipmask)+"/"+ipmasklen, hop));
                 } else{
-                    out.println(IPv4Util.IP2Str(ip) + " " + ipmasklen + " " + hop);
+                    out.println(IPv4Util.IP2Str(ip) + "/" + ipmasklen + " " + hop);
                 }
 
                 num ++;
