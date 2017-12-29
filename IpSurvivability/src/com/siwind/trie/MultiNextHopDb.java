@@ -99,7 +99,7 @@ public class MultiNextHopDb {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
-                String[] strs = line.trim().split("\\s+");
+                String[] strs = line.trim().split("\\s+|/|\\\\"); // separator of /\ or white char
                 if (strs.length < 2) continue; //wrong format!
 
                 if (!IPv4Util.isIPv4Valid(strs[0])) continue;
