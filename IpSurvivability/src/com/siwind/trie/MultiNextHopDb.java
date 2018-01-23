@@ -16,7 +16,7 @@ import java.util.Random;
 public class MultiNextHopDb {
 
 
-    static final int DEFAULT_MAXNUM = 1024;
+    static final int DEFAULT_MAXNUM = 2*1024*1024; //2M items
     static final int NULL_NHDB_INDEX = 0;
 
     ArrayList< NextHopItem > nhdb = null;
@@ -55,11 +55,31 @@ public class MultiNextHopDb {
         return this.nhdb.size()-1;
     }
 
+    /**
+     *
+     * @param ip
+     * @param masklen
+     * @param numRouters
+     * @return
+     */
     public int addRandomNextItem(int ip, int masklen, int numRouters){
 
         this.nhdb.add(NextHopItem.generateRandomNextHop(ip,masklen, numRouters));
 
         return this.nhdb.size()-1;
+    }
+
+    /**
+     * add a random fix item index from nhdb table.
+     * @param ip
+     * @param masklen
+     * @param numRouters
+     * @return
+     */
+    public int addRandomFixItem(int ip, int masklen, int numRouters){
+
+        int nhdb_index = NextHopItem.generateRandomFixHop(this.DEFAULT_MAXNUM);
+        return nhdb_index;
     }
 
     public int getNumberOfNextHop(){
@@ -198,6 +218,10 @@ class NextHopItem{
 
     int nhdb[] = null; // array of number routers!
 
+    static {
+        random = new Random(); //init
+    }
+
     public NextHopItem(int ipAddr, int maskLen, int numOfRouter){
         if( numOfRouter<=0 ){
             throw new InvalidParameterException("Number of Routers must greater than zero.");
@@ -239,6 +263,11 @@ class NextHopItem{
     public static int getIPfromMaskLen(int maskLen){
         int ip = (maskLen==32)?0xFFFFFFFF:(((1<<maskLen)-1)<<(32-maskLen));
         return ip;
+    }
+
+    public static int generateRandomFixHop(int maxNum){
+
+        return random.nextInt(maxNum-1)+1; //not zero
     }
 
     public static NextHopItem generateRandomNextHop(int ipAddr, int maskLen, int numOfRouter){

@@ -194,10 +194,17 @@ public class BinTree<T> {
 }
 
 class TreeNode<T> {
+
+    //number of node this tree contains
+    protected int count = 0;
     protected T data;
     protected TreeNode<T> left, right;  //left and right child
 
+    public TreeNode() {
+        this(null);
+    }
     public TreeNode(T data) {
+        this.count = 0;
         this.data = data;
         this.left = this.right = null; //
     }
@@ -223,5 +230,26 @@ class TreeNode<T> {
 
     public void setRight(TreeNode<T> right) {
         this.right = right;
+    }
+
+    public void clear(){
+        clear(this.left);
+        clear(this.right);
+        this.left = this.right = null;
+        this.data = null;
+        this.count = 0;
+    }
+    protected static <T> void clear(TreeNode<T> node){
+        if( node != null ){
+            if( node.left!= null ){
+                clear(node.left);
+                node.left = null;
+            }
+            if( node.right!= null ){
+                clear(node.right);
+                node.right = null;
+            }
+
+        }
     }
 }

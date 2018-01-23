@@ -196,4 +196,45 @@ public final class IPv4Util {
         int maskip = NetmaskFromMasklen(masklen);
         return ip == (ip&maskip);
     }
+
+    public static boolean isIPv4Public(String strIP){
+        return isIPv4Public(IPfromStr(strIP));
+    }
+
+    public static boolean isIPv4Public(int ip){
+        int exIp1=0,exIp2=0;
+        if( ip ==0 || ip == 0xFFFFFFFF ) return false;
+        if( ((ip>>>24)&0xff) == 0xFF || ((ip>>>16)&0xff) == 0xFF || ((ip>>>8)&0xff) == 0xFF || ((ip>>>0)&0xff) == 0xFF ) return false;
+        if( (ip>>>24) > 223 ) return false;
+        if( (ip>>>24) == 10 || (ip>>>24) == 127 ) return false; //10.0.0.0/8, 127.0.0.0/8
+
+        //Link-local addresses for IPv4 are defined in the address block 169.254.0.0/16 in CIDR notation
+        if( (ip>>>16) == ((169<<8) + 254) ) return false;//169.254
+
+        //In April 2012, IANA allocated 100.64.0.0/10 for use in carrier-grade NAT scenarios in RFC 6598.[3] This address block should not be used either on private networks or on the public Internet: it is intended only for use within the internal operations of carrier networks.
+        if( (ip>>>16) == ((100<<8) + 64) ) return false;//100.64
+
+        exIp1 = (172<<8) + 16;exIp2 = (172<<8)+31;
+        if( (ip>>>16)>=exIp1 && (ip>>>16) <= exIp2 ) return false; //172.16-31
+        if( (ip>>>16) == (192<<8)+168 ) return false; //192.168
+        return true;
+    }
+
+    /**
+     * IPv4 address convert to int array.
+     * @param ip
+     * @return
+     */
+    public static int[] IP2Array(int ip){
+        int[] arr = new int[32];
+        for(int i=0;i<32;i++){
+            int sh = 31 - i;
+            arr[i] = (ip>>sh)&0x1;
+        }
+        return arr;
+    }
+
+    public static int[] IP2Array(String ipstr){
+        return IP2Array(IPfromStr(ipstr));
+    }
 }
