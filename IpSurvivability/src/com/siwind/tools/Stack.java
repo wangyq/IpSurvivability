@@ -61,6 +61,22 @@ public class Stack<T> {
         return val;
     }
 
+    /**
+     * current element number
+     * @return
+     */
+    public int Size(){
+        if( isEmpty() ) return 0;
+        return headPtr;
+    }
+
+    /**
+     * current capacity, but not element number
+     * @return
+     */
+    public int Capacity(){
+        return this.data.length;
+    }
     public static void main(String[] args) {
         Stack<Integer> st = new Stack<Integer>();
 

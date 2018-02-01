@@ -32,6 +32,16 @@ public class StrideTrie {
 
     }
 
+    /**
+     * query
+     * @param ip
+     * @param masklen
+     * @return
+     */
+    public ArrayList<Integer> Query(int ip, int masklen){
+        return FixNode.queryNode(this.m_root,ip,masklen);
+    }
+
     public int getTotalEntry(){
         return m_total;
     }
@@ -582,15 +592,15 @@ public class StrideTrie {
         return true;
 
     }
-    public static boolean bAddCmd(String strCmd, BinTrie<Integer> btrie) {
+    public static boolean bAddCmd(String strCmd, BinTrieGen<Integer> btrie) {
         try {
             if (strCmd.isEmpty()) return false;
             String[] strs = strCmd.split("\\s+");
             if (strs[0].compareTo("badd") != 0) throw new Exception("Command format error!");
             int[] ips = new int[2];
             //get ip address and netmasklen
-            if (!IPv4Util.IPandMasklenfromStr(strs[1], ips)) return false;
-            if (strs[2].compareTo("via") != 0) return false;
+            if (!IPv4Util.IPandMasklenfromStr(strs[1], ips)) throw new Exception("IPaddress format error!");;
+            if (strs[2].compareTo("via") != 0) throw new Exception("Command format error!");;
 
             int nhop = 0;
             nhop = Integer.parseInt(strs[3]);
@@ -606,19 +616,66 @@ public class StrideTrie {
         }
         return true;
     }
-    public static boolean bDelCmd(String strCmd, BinTrie<Integer> btrie) {
+    public static boolean bDelCmd(String strCmd, BinTrieGen<Integer> btrie) {
 
         return true;
     }
-    public static boolean bLoadCmd(String strCmd, BinTrie<Integer> btrie) {
+    public static boolean bLoadCmd(String strCmd, BinTrieGen<Integer> btrie) {
+        String strFile = "";
 
+        try {
+
+            if (strCmd.isEmpty()) return false;
+            String[] strs = strCmd.split("\\s+");
+            if (strs[0].compareTo("bload") != 0) return false;
+
+            if (strs.length < 2) {
+                System.out.println(" addfile filename is needed!");
+            } else {
+                strFile = strs[1];
+                if (strFile.charAt(0) != '/') {
+                    strFile = Util.getCurDir() + strFile;
+                }
+                //System.out.println("Current Directory: " + Util.getCurDir());
+                int maxNum = 0;
+                if (strs.length >= 3) {
+                    maxNum = Integer.parseInt(strs[2]);
+                }
+
+                ArrayList<int[]> items = loadEntryFromFile(strFile, maxNum, btrie.MAXNHDB);
+
+                btrie.clear();
+
+                long t1 = System.nanoTime();
+                long t11 = System.currentTimeMillis();
+                for (int i = 0; i < items.size(); i++) {
+                    int ips[] = items.get(i);
+                    btrie.insert(ips[0],ips[1],ips[2]);
+                }
+                long t2 = System.nanoTime();
+                long t22 = System.currentTimeMillis();
+
+                long between = t2 - t1;
+                long microsecond = between / 1000;
+                long milis = (t22 - t11);
+                System.out.println("Total time is : " + microsecond + " us (microsecond). " + milis + " milisecond. Average insert time = " + microsecond / btrie.getCount() + " us (microsecond).");
+                System.out.println("Total entries is : " + btrie.getCount());
+            }
+
+            //get ip address and netmasklen
+
+        } catch (Exception ex) {
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
         return true;
     }
-    public static boolean bShowCmd(String strCmd, BinTrie<Integer> btrie) {
+    public static boolean bShowCmd(String strCmd, BinTrieGen<Integer> btrie) {
         try {
             if (strCmd.isEmpty()) return false;
             String[] strs = strCmd.split("\\s+");
-            if (strs[0].compareTo("show") != 0) return false;
+            if (strs[0].compareTo("bshow") != 0) return false;
 
             int[] ips = {0, 0};
             if (strs.length >= 2) {
@@ -629,11 +686,45 @@ public class StrideTrie {
                 }
             }
 
+            ArrayList<VisitItem<Integer> > entries = btrie.getEntries(ips[0],ips[1]);
+            System.out.println("IPaddress/Masklen               Nexthop");
+            for(int i=0;i<entries.size();i++){
+                VisitItem<Integer> ele = entries.get(i);
+                System.out.println(IPv4Util.IP2Str(ele.ip)+"/"+ele.masklen+"                      "+ele.data);
+            }
+            System.out.println("Number nodes to show : " + entries.size());
 
+            System.out.println("Total entries is : " + btrie.getCount());
 
-            //System.out.println("Number nodes to show : " + nhdb.size());
+        } catch (Exception ex) {
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+    public static boolean bInfoCmd(String strCmd, BinTrieGen<Integer> btrie) {
+        try {
+            if (strCmd.isEmpty()) return false;
+            String[] strs = strCmd.split("\\s+");
+            if (strs[0].compareTo("binfo") != 0) return false;
 
-            //System.out.println("Total entries is : " + trie.m_total);
+            btrie.printInfo();
+
+        } catch (Exception ex) {
+            System.out.println(strCmd + " failed!");
+            //ex.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+    public static boolean bTestCmd(String strCmd, BinTrieGen<Integer> btrie) {
+        try {
+            if (strCmd.isEmpty()) return false;
+            String[] strs = strCmd.split("\\s+");
+            if (strs[0].compareTo("btest") != 0) return false;
+
+            LargeRouteTest.MainTestBTrie(strCmd,btrie);
 
         } catch (Exception ex) {
             System.out.println(strCmd + " failed!");
@@ -673,7 +764,7 @@ public class StrideTrie {
         return strLine;
     }
 
-    public static void showMenu(StrideTrie trie,BinTrie<Integer> btrie) {
+    public static void showMenu(StrideTrie trie,BinTrieGen<Integer> btrie) {
 
         String strMenu = "Available command are: \n" +
                 "add [ipaddr/masklen] via [nexthop] \n" +
@@ -685,12 +776,14 @@ public class StrideTrie {
                 "show [ipaddr/masklen] \n" +
                 "info \n" +
                 "rand [num] \n" +
-                "test \n" +
+                "test [con | query]  constrution/query time!\n" +
                 "============\n" +
                 "badd [ipaddr/masklen] via [nexthop] \n" +
                 "bdel [ipaddr/masklen] \n" +
                 "bload [file] \n" +
                 "show [ipaddr/masklen] \n" +
+                "binfo \n" +
+                "btest [con | query]  constrution/query time!\n" +
                 "============ \n" +
                 "help | ? \n" +
                 "exit | quit \n" +
@@ -754,6 +847,12 @@ public class StrideTrie {
             }else if (strCmd.compareTo("bshow") == 0) {
                 bShowCmd(strLine, btrie);
 
+            }else if (strCmd.compareTo("binfo") == 0) {
+                bInfoCmd(strLine, btrie);
+
+            }else if (strCmd.compareTo("btest") == 0) {
+                bTestCmd(strLine, btrie);
+
             }
             else if (strCmd.compareTo("test") == 0) {
                 testCmd(strLine, trie);
@@ -794,7 +893,7 @@ public class StrideTrie {
     public static void runTrie() {
         int[] steps = {16,4,2,2,4,4};//{8, 4, 4, 2, 2, 2, 2, 4, 4};//{8,8,8,8};//{16,8,4,4};
         StrideTrie trie = new StrideTrie(steps);
-        BinTrie<Integer> btrie = new BinTrie<>();
+        BinTrieGen<Integer> btrie = new BinTrieGen<>();
 
         //StrideTrie trie = new StrideTrie(16,8,4,4);
 
@@ -805,7 +904,7 @@ public class StrideTrie {
         init(null);
     }
 
-    protected void init(int[] steps) {
+    public void init(int[] steps) {
         m_total = 0;
         if (steps != null) {
             m_steps = new int[steps.length];
@@ -1034,8 +1133,10 @@ class FixNode {
         return ipaddr & (((1 << fragmentlen) - 1) << (32 - fragmentlen));  //caution: must zero-right-shift of >>>
     }
 
-    public static FixNode queryNode(FixNode root, int ipaddr, int masklen) {
-        if ((null == root) || (masklen <= 0)) return root;
+    public static ArrayList<Integer> queryNode(FixNode root, int ipaddr, int masklen) {
+        ArrayList<Integer> nhdb = new ArrayList<>();
+
+        if ((null == root) || (masklen <= 0)) return nhdb;
 
         FixNode node = root;
 
@@ -1047,8 +1148,31 @@ class FixNode {
             node = node.next[index];
 
         }
+        //=== here masklen <= node.branch
+        //to be continue...
+        if( node == null ) return nhdb;
 
-        return node;
+        if( node.branch == masklen ){
+            int index = node.getIPFragmentOffset(ipaddr, node.branch);
+            if( node.nhop[index] != 0 ){ //find answer!
+                nhdb.add(node.nhop[index]);
+            }
+        }else { //find route, masklen < node.branch
+            int d = node.branch - masklen;
+            int span = 1;  //
+            int ip_offset = node.getIPFragmentOffset(ipaddr, masklen);
+            int nodeID = node.getNodIDfromOffset(ip_offset, masklen);
+            int start = node.getNodeStartIndex(nodeID);
+            int end = node.getNodeEndIndex(nodeID);
+
+            for(int i=start;i<end;i++){
+                if(node.nhop[i] != 0 ){
+                    nhdb.add(node.nhop[i]);
+                }
+            }
+        }
+
+        return nhdb;
     }
 
     /**
